@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Transcription Studio</title>
+    
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <!-- Socket.IO Client -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Spectral:wght@300;400;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #141922;
+            --bg-tertiary: #1e2530;
+            --accent-primary: #00d9ff;
+            --accent-secondary: #ff006e;
+            --accent-tertiary: #ffbe0b;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --border: #30363d;
+            --success: #3fb950;
+            --warning: #d29922;
+            --processing: #a371f7;
+        }
+        
+        body {
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        
+        /* Animated background gradient */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(0, 217, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 0, 110, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(255, 190, 11, 0.05) 0%, transparent 50%);
+            animation: gradient-shift 20s ease infinite;
+            z-index: -1;
+        }
+        
+        @keyframes gradient-shift {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(10%, -10%) rotate(120deg); }
+            66% { transform: translate(-10%, 10%) rotate(240deg); }
+        }
+        
+        #app {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            animation: fadeIn 0.6s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Header */
+        .header {
+            margin-bottom: 3rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 2rem;
+        }
+        
+        .header h1 {
+            font-family: 'Spectral', serif;
+            font-size: 3.5rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            animation: slideInFromTop 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        @keyframes slideInFromTop {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .header .subtitle {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            animation: slideInFromTop 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s backwards;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1.5rem;
+            animation: slideInFromTop 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s backwards;
+        }
+        
+        .stat {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        
+        /* Connection status */
+        .connection-status {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 2rem;
+            font-size: 0.85rem;
+            z-index: 1000;
+            animation: slideInFromRight 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        @keyframes slideInFromRight {
+            from { opacity: 0; transform: translateX(50px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s ease infinite;
+        }
+        
+        .status-indicator.disconnected {
+            background: var(--text-muted);
+            animation: none;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+        
+        /* Audio list */
+        .audio-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .audio-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            animation: slideInFromBottom 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+        }
+        
+        @keyframes slideInFromBottom {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .audio-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--accent-primary);
+            transform: scaleY(0);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        .audio-item:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--accent-primary);
+            transform: translateX(8px);
+        }
+        
+        .audio-item:hover::before {
+            transform: scaleY(1);
+        }
+        
+        .audio-item.active {
+            border-color: var(--accent-primary);
+            background: var(--bg-tertiary);
+        }
+        
+        .audio-item.active::before {
+            transform: scaleY(1);
+        }
+        
+        .audio-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            gap: 1rem;
+        }
+        
+        .audio-title {
+            font-family: 'Spectral', serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.35rem 0.85rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+        }
+        
+        .status-badge.completed {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+        }
+        
+        .status-badge.processing {
+            background: rgba(163, 113, 247, 0.15);
+            color: var(--processing);
+            border: 1px solid rgba(163, 113, 247, 0.3);
+            animation: processingPulse 2s ease infinite;
+        }
+        
+        @keyframes processingPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .status-badge.pending {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--warning);
+            border: 1px solid rgba(210, 153, 34, 0.3);
+        }
+        
+        .status-badge.queued {
+            background: rgba(139, 148, 158, 0.15);
+            color: var(--text-secondary);
+            border: 1px solid rgba(139, 148, 158, 0.3);
+        }
+        
+        .transcription {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.7;
+            margin-bottom: 1rem;
+            font-family: 'Spectral', serif;
+        }
+        
+        .transcription.empty {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        
+        .play-button {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 2rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .play-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 217, 255, 0.3);
+        }
+        
+        .play-button:active {
+            transform: translateY(0);
+        }
+        
+        .play-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Audio player */
+        .audio-player {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, var(--bg-primary), var(--bg-secondary));
+            border-top: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+            z-index: 999;
+            animation: slideInFromBottom 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(20px);
+        }
+        
+        .player-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .now-playing {
+            font-family: 'Spectral', serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .close-player {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 1.5rem;
+            cursor: pointer;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+        
+        .close-player:hover {
+            border-color: var(--accent-secondary);
+            color: var(--accent-secondary);
+        }
+        
+        .player-controls {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        
+        .control-button {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+        
+        .control-button:hover {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            transform: scale(1.1);
+        }
+        
+        .control-button.play-pause {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border: none;
+        }
+        
+        .control-button.play-pause:hover {
+            transform: scale(1.15);
+            box-shadow: 0 8px 24px rgba(0, 217, 255, 0.3);
+        }
+        
+        .progress-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            border-radius: 3px;
+            transition: width 0.1s linear;
+            position: relative;
+        }
+        
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+            background: white;
+            border-radius: 50%;
+            transform: translate(50%, -25%);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
+        }
+        
+        .empty-state h3 {
+            font-family: 'Spectral', serif;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--text-muted);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .stats {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .connection-status {
+                top: 1rem;
+                right: 1rem;
+            }
+            
+            .audio-player {
+                padding: 1rem;
+            }
+            
+            .player-controls {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Connection Status -->
+        <div class="connection-status">
+            <div class="status-indicator" :class="{ disconnected: !connected }"></div>
+            <span>{{ connected ? 'Connected' : 'Disconnected' }}</span>
+        </div>
+        
+        <!-- Header -->
+        <header class="header">
+            <h1>Audio Transcription Studio</h1>
+            <p class="subtitle">Real-time voice-to-text processing</p>
+            
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value">{{ totalFiles }}</div>
+                    <div class="stat-label">Total Recordings</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{{ completedFiles }}</div>
+                    <div class="stat-label">Transcribed</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{{ processingFiles }}</div>
+                    <div class="stat-label">Processing</div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Audio List -->
+        <div class="audio-list" v-if="files.length > 0">
+            <div 
+                v-for="(file, index) in files" 
+                :key="file.filename"
+                :style="{ animationDelay: `${index * 0.05}s` }"
+                class="audio-item"
+                :class="{ active: currentFile && currentFile.filename === file.filename }"
+            >
+                <div class="audio-header">
+                    <h3 class="audio-title">{{ file.filename }}</h3>
+                    <span class="status-badge" :class="file.status">
+                        <span v-if="file.status === 'processing'" class="spinner"></span>
+                        {{ file.status }}
+                    </span>
+                </div>
+                
+                <p class="transcription" :class="{ empty: !file.transcription }">
+                    {{ file.transcription || 'Awaiting transcription...' }}
+                </p>
+                
+                <button 
+                    class="play-button" 
+                    @click="playAudio(file)"
+                    :disabled="!file.transcription && file.status !== 'completed'"
+                >
+                    <span>{{ currentFile && currentFile.filename === file.filename && isPlaying ? '⏸' : '▶' }}</span>
+                    {{ currentFile && currentFile.filename === file.filename && isPlaying ? 'Pause' : 'Play' }}
+                </button>
+            </div>
+        </div>
+        
+        <!-- Empty State -->
+        <div class="empty-state" v-else>
+            <h3>No recordings found</h3>
+            <p>Add .mp3 files to the recordings directory to get started</p>
+        </div>
+        
+        <!-- Audio Player -->
+        <div class="audio-player" v-if="currentFile">
+            <div class="player-container">
+                <div class="player-header">
+                    <div class="now-playing">{{ currentFile.filename }}</div>
+                    <button class="close-player" @click="closePlayer">✕ Close</button>
+                </div>
+                
+                <div class="player-controls">
+                    <button class="control-button" @click="skipBackward" title="Skip backward 10s">
+                        ⏪
+                    </button>
+                    
+                    <button class="control-button play-pause" @click="togglePlayPause">
+                        {{ isPlaying ? '⏸' : '▶' }}
+                    </button>
+                    
+                    <button class="control-button" @click="skipForward" title="Skip forward 10s">
+                        ⏩
+                    </button>
+                    
+                    <div class="progress-container">
+                        <div class="time-display">
+                            <span>{{ formatTime(currentTime) }}</span>
+                            <span>{{ formatTime(duration) }}</span>
+                        </div>
+                        <div class="progress-bar" @click="seekTo" ref="progressBar">
+                            <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <audio 
+                ref="audioElement"
+                @timeupdate="updateProgress"
+                @loadedmetadata="onAudioLoaded"
+                @ended="onAudioEnded"
+                @play="isPlaying = true"
+                @pause="isPlaying = false"
+            ></audio>
+        </div>
+    </div>
+    
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    socket: null,
+                    connected: false,
+                    files: [],
+                    currentFile: null,
+                    isPlaying: false,
+                    currentTime: 0,
+                    duration: 0
+                }
+            },
+            
+            computed: {
+                totalFiles() {
+                    return this.files.length;
+                },
+                
+                completedFiles() {
+                    return this.files.filter(f => f.status === 'completed').length;
+                },
+                
+                processingFiles() {
+                    return this.files.filter(f => f.status === 'processing').length;
+                },
+                
+                progressPercent() {
+                    if (this.duration === 0) return 0;
+                    return (this.currentTime / this.duration) * 100;
+                }
+            },
+            
+            mounted() {
+                this.initSocket();
+            },
+            
+            methods: {
+                initSocket() {
+                    // Connect to SocketIO server
+                    this.socket = io();
+                    
+                    // Connection events
+                    this.socket.on('connect', () => {
+                        console.log('Connected to server');
+                        this.connected = true;
+                        // Request initial file list
+                        this.socket.emit('get_files');
+                    });
+                    
+                    this.socket.on('disconnect', () => {
+                        console.log('Disconnected from server');
+                        this.connected = false;
+                    });
+                    
+                    // File list response
+                    this.socket.on('files_list', (data) => {
+                        console.log('Received files list:', data);
+                        this.files = data.files;
+                    });
+                    
+                    // File update notification (broadcast to all clients)
+                    this.socket.on('file_update', (fileData) => {
+                        console.log('File update received:', fileData);
+                        const index = this.files.findIndex(f => f.filename === fileData.filename);
+                        
+                        if (index >= 0) {
+                            // Update existing file
+                            this.files[index] = fileData;
+                        } else {
+                            // Add new file
+                            this.files.push(fileData);
+                            // Sort by filename
+                            this.files.sort((a, b) => a.filename.localeCompare(b.filename));
+                        }
+                        
+                        // Update current file if it's being played
+                        if (this.currentFile && this.currentFile.filename === fileData.filename) {
+                            this.currentFile = fileData;
+                        }
+                    });
+                    
+                    // Audio stream ready response
+                    this.socket.on('audio_stream_ready', (data) => {
+                        console.log('Audio stream ready:', data);
+                        this.loadAudio(data.url);
+                    });
+                    
+                    // Error handling
+                    this.socket.on('error', (error) => {
+                        console.error('Socket error:', error);
+                    });
+                },
+                
+                playAudio(file) {
+                    if (this.currentFile && this.currentFile.filename === file.filename) {
+                        // Toggle play/pause for current file
+                        this.togglePlayPause();
+                    } else {
+                        // Load and play new file
+                        this.currentFile = file;
+                        this.socket.emit('request_audio_stream', { filename: file.filename });
+                    }
+                },
+                
+                loadAudio(url) {
+                    const audio = this.$refs.audioElement;
+                    audio.src = url;
+                    audio.load();
+                    audio.play();
+                },
+                
+                togglePlayPause() {
+                    const audio = this.$refs.audioElement;
+                    if (audio.paused) {
+                        audio.play();
+                    } else {
+                        audio.pause();
+                    }
+                },
+                
+                skipBackward() {
+                    const audio = this.$refs.audioElement;
+                    audio.currentTime = Math.max(0, audio.currentTime - 10);
+                },
+                
+                skipForward() {
+                    const audio = this.$refs.audioElement;
+                    audio.currentTime = Math.min(audio.duration, audio.currentTime + 10);
+                },
+                
+                seekTo(event) {
+                    const progressBar = this.$refs.progressBar;
+                    const rect = progressBar.getBoundingClientRect();
+                    const percent = (event.clientX - rect.left) / rect.width;
+                    const audio = this.$refs.audioElement;
+                    audio.currentTime = percent * audio.duration;
+                },
+                
+                updateProgress() {
+                    const audio = this.$refs.audioElement;
+                    this.currentTime = audio.currentTime;
+                },
+                
+                onAudioLoaded() {
+                    const audio = this.$refs.audioElement;
+                    this.duration = audio.duration;
+                },
+                
+                onAudioEnded() {
+                    this.isPlaying = false;
+                },
+                
+                closePlayer() {
+                    const audio = this.$refs.audioElement;
+                    audio.pause();
+                    this.currentFile = null;
+                    this.currentTime = 0;
+                    this.duration = 0;
+                },
+                
+                formatTime(seconds) {
+                    if (!seconds || isNaN(seconds)) return '0:00';
+                    const mins = Math.floor(seconds / 60);
+                    const secs = Math.floor(seconds % 60);
+                    return `${mins}:${secs.toString().padStart(2, '0')}`;
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
