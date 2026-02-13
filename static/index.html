@@ -247,6 +247,10 @@
             color: var(--text-secondary);
             word-break: break-word;
         }
+
+        .file-size {
+            color: var(--text-muted);
+        }
         
         .status-badge {
             display: inline-flex;
@@ -577,7 +581,7 @@
                 :class="{ active: currentFile && currentFile.filename === file.filename }"
             >
                 <div class="audio-header">
-                    <h3 class="audio-title">{{ file.filename }}</h3>
+                    <h3 class="audio-title">{{ file.filename }} <span class="file-size">({{ file.size_kb }}k)</span></h3>
                     <div class="header-right">
                         <span class="status-badge" :class="file.status">
                             <span v-if="file.status === 'processing'" class="spinner"></span>

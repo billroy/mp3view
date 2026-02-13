@@ -86,8 +86,10 @@ class AudioFileHandler(FileSystemEventHandler):
         # Add to registry immediately
         filename = file_path.name
         if filename not in file_registry:
+            size_kb = round(file_path.stat().st_size / 1024) if file_path.exists() else 0
             file_registry[filename] = {
                 'filename': filename,
+                'size_kb': size_kb,
                 'transcription': None,
                 'status': 'queued',
                 'added': datetime.now().isoformat()
@@ -124,6 +126,7 @@ def scan_existing_files():
         
         file_registry[filename] = {
             'filename': filename,
+            'size_kb': round(mp3_file.stat().st_size / 1024),
             'transcription': transcription,
             'status': status,
             'added': datetime.fromtimestamp(mp3_file.stat().st_mtime).isoformat()
