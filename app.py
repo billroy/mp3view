@@ -18,8 +18,7 @@ from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-import speech_recognition as sr
-from pydub import AudioSegment
+import whisper
 
 # Configure logging
 logging.basicConfig(
@@ -39,6 +38,7 @@ RECORDINGS_DIR = Path('recordings')
 transcription_queue = queue.Queue()
 file_registry: Dict[str, dict] = {}
 shutdown_event = threading.Event()
+whisper_model = None
 
 
 class AudioFileHandler(FileSystemEventHandler):
@@ -134,41 +134,28 @@ def scan_existing_files():
             transcription_queue.put(mp3_file)
 
 
+def load_whisper_model():
+    """Load the Whisper model (lazy, once)"""
+    global whisper_model
+    if whisper_model is None:
+        logger.info("[Whisper] Loading 'base' model (first load may download ~140MB)...")
+        whisper_model = whisper.load_model("base")
+        logger.info("[Whisper] Model loaded successfully")
+    return whisper_model
+
+
 def transcribe_audio(file_path: Path) -> Optional[str]:
-    """
-    Transcribe an audio file using speech recognition
-    Converts MP3 to WAV first, then uses Google Speech Recognition
-    """
+    """Transcribe an audio file using local OpenAI Whisper"""
     try:
         logger.info(f"Starting transcription of {file_path.name}")
-        
-        # Convert MP3 to WAV
-        wav_path = file_path.with_suffix('.wav')
-        audio = AudioSegment.from_mp3(str(file_path))
-        audio.export(str(wav_path), format='wav')
-        
-        # Initialize recognizer
-        recognizer = sr.Recognizer()
-        
-        # Load audio file
-        with sr.AudioFile(str(wav_path)) as source:
-            audio_data = recognizer.record(source)
-        
-        # Perform transcription
-        text = recognizer.recognize_google(audio_data)
-        
-        # Clean up temporary WAV file
-        wav_path.unlink()
-        
+        model = load_whisper_model()
+        result = model.transcribe(str(file_path))
+        text = result["text"].strip()
+        if not text:
+            logger.warning(f"Whisper returned empty text for {file_path.name}")
+            return "[Audio not intelligible]"
         logger.info(f"Successfully transcribed {file_path.name}")
         return text
-        
-    except sr.UnknownValueError:
-        logger.warning(f"Could not understand audio in {file_path.name}")
-        return "[Audio not intelligible]"
-    except sr.RequestError as e:
-        logger.error(f"Could not request results from speech recognition service: {e}")
-        return "[Transcription service error]"
     except Exception as e:
         logger.error(f"Error transcribing {file_path.name}: {e}")
         return f"[Transcription error: {str(e)}]"
