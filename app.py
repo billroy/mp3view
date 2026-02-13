@@ -62,11 +62,27 @@ class AudioFileHandler(FileSystemEventHandler):
             logger.info(f"Audio file moved/renamed into directory: {event.dest_path}")
             file_path = Path(event.dest_path)
             self._queue_for_transcription(file_path)
-    
+
+    def on_deleted(self, event):
+        """Handle deletion of .txt transcription files — re-transcribe the associated .mp3"""
+        if event.is_directory:
+            return
+
+        if event.src_path.endswith('.txt'):
+            txt_path = Path(event.src_path)
+            mp3_path = txt_path.with_suffix('.mp3')
+            filename = mp3_path.name
+            if mp3_path.exists() and filename in file_registry:
+                logger.info(f"Transcription file deleted externally: {txt_path.name} — re-queuing '{filename}'")
+                file_registry[filename]['transcription'] = None
+                file_registry[filename]['status'] = 'queued'
+                socketio.emit('file_update', file_registry[filename])
+                transcription_queue.put(mp3_path)
+
     def _queue_for_transcription(self, file_path: Path):
         """Add file to transcription queue"""
         transcription_queue.put(file_path)
-        
+
         # Add to registry immediately
         filename = file_path.name
         if filename not in file_registry:
@@ -160,43 +176,49 @@ def transcribe_audio(file_path: Path) -> Optional[str]:
 
 def transcription_worker():
     """Background worker that processes transcription queue"""
-    logger.info("Transcription worker started")
-    
+    logger.info("Transcription worker started, waiting for items...")
+
     while not shutdown_event.is_set():
         try:
             # Get file from queue with timeout
             file_path = transcription_queue.get(timeout=1)
-            
+
             filename = file_path.name
-            
+            logger.info(f"[Worker] Dequeued '{filename}' for transcription (queue size now: {transcription_queue.qsize()})")
+
             # Update status to processing
             if filename in file_registry:
                 file_registry[filename]['status'] = 'processing'
+                logger.info(f"[Worker] Emitting status 'processing' for '{filename}'")
                 socketio.emit('file_update', file_registry[filename])
 
             # Perform transcription
+            logger.info(f"[Worker] Starting transcribe_audio() for '{filename}'...")
             transcription = transcribe_audio(file_path)
-            
+            logger.info(f"[Worker] transcribe_audio() returned for '{filename}': {len(transcription)} chars")
+
             # Save transcription to file
             txt_path = file_path.with_suffix('.txt')
             txt_path.write_text(transcription, encoding='utf-8')
-            
+            logger.info(f"[Worker] Saved transcription to '{txt_path}'")
+
             # Update registry
             if filename in file_registry:
                 file_registry[filename]['transcription'] = transcription
                 file_registry[filename]['status'] = 'completed'
-                
+
                 # Broadcast update to all clients
+                logger.info(f"[Worker] Emitting status 'completed' for '{filename}'")
                 socketio.emit('file_update', file_registry[filename])
-                logger.info(f"Transcription complete and broadcasted for {filename}")
-            
+                logger.info(f"[Worker] Transcription complete and broadcasted for '{filename}'")
+
             transcription_queue.task_done()
-            
+
         except queue.Empty:
             continue
         except Exception as e:
-            logger.error(f"Error in transcription worker: {e}")
-    
+            logger.error(f"[Worker] Error processing transcription: {e}", exc_info=True)
+
     logger.info("Transcription worker stopped")
 
 
@@ -252,6 +274,43 @@ def handle_audio_stream_request(data):
         'filename': filename,
         'url': f'/audio/{filename}'
     })
+
+
+@socketio.on('retranscribe')
+def handle_retranscribe(data):
+    """Delete existing transcription and re-queue the file"""
+    import flask
+    filename = data.get('filename')
+
+    if not filename:
+        emit('error', {'message': 'No filename provided'})
+        return
+
+    if filename not in file_registry:
+        emit('error', {'message': f'File not found: {filename}'})
+        return
+
+    mp3_path = RECORDINGS_DIR / filename
+    if not mp3_path.exists():
+        emit('error', {'message': f'MP3 file not found on disk: {filename}'})
+        return
+
+    logger.info(f"[Retranscribe] Client {flask.request.sid} requested re-transcription of '{filename}'")
+
+    # Delete existing .txt if present
+    txt_path = mp3_path.with_suffix('.txt')
+    if txt_path.exists():
+        txt_path.unlink()
+        logger.info(f"[Retranscribe] Deleted '{txt_path.name}'")
+
+    # Update registry and notify all clients
+    file_registry[filename]['transcription'] = None
+    file_registry[filename]['status'] = 'queued'
+    socketio.emit('file_update', file_registry[filename])
+
+    # Queue for transcription
+    transcription_queue.put(mp3_path)
+    logger.info(f"[Retranscribe] Queued '{filename}' for re-transcription")
 
 
 # Flask routes

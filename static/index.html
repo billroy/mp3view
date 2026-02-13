@@ -188,7 +188,7 @@
             background: var(--bg-secondary);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 1.5rem;
+            padding: 0.75rem 1.25rem;
             transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             cursor: pointer;
             position: relative;
@@ -235,16 +235,16 @@
         .audio-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 1rem;
+            align-items: center;
+            margin-bottom: 0.4rem;
             gap: 1rem;
         }
-        
+
         .audio-title {
-            font-family: 'Spectral', serif;
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--text-primary);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 400;
+            color: var(--text-secondary);
             word-break: break-word;
         }
         
@@ -292,10 +292,10 @@
         }
         
         .transcription {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            line-height: 1.7;
-            margin-bottom: 1rem;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 0.5rem;
             font-family: 'Spectral', serif;
         }
         
@@ -333,6 +333,37 @@
         
         .play-button:disabled {
             opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .audio-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .retranscribe-button {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .retranscribe-button:hover {
+            border-color: var(--accent-tertiary);
+            color: var(--accent-tertiary);
+        }
+
+        .retranscribe-button:disabled {
+            opacity: 0.3;
             cursor: not-allowed;
         }
         
@@ -578,14 +609,23 @@
                     {{ file.transcription || 'Awaiting transcription...' }}
                 </p>
                 
-                <button 
-                    class="play-button" 
-                    @click="playAudio(file)"
-                    :disabled="!file.transcription && file.status !== 'completed'"
-                >
-                    <span>{{ currentFile && currentFile.filename === file.filename && isPlaying ? '⏸' : '▶' }}</span>
-                    {{ currentFile && currentFile.filename === file.filename && isPlaying ? 'Pause' : 'Play' }}
-                </button>
+                <div class="audio-actions">
+                    <button
+                        class="play-button"
+                        @click="playAudio(file)"
+                        :disabled="!file.transcription && file.status !== 'completed'"
+                    >
+                        <span>{{ currentFile && currentFile.filename === file.filename && isPlaying ? '⏸' : '▶' }}</span>
+                        {{ currentFile && currentFile.filename === file.filename && isPlaying ? 'Pause' : 'Play' }}
+                    </button>
+                    <button
+                        class="retranscribe-button"
+                        @click.stop="retranscribe(file)"
+                        :disabled="file.status === 'processing' || file.status === 'queued'"
+                    >
+                        Re-transcribe
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -699,21 +739,20 @@
                     // File list response
                     this.socket.on('files_list', (data) => {
                         console.log('Received files list:', data);
-                        this.files = data.files;
+                        this.files = data.files.sort((a, b) => a.filename.localeCompare(b.filename));
                     });
                     
                     // File update notification (broadcast to all clients)
                     this.socket.on('file_update', (fileData) => {
                         console.log('File update received:', fileData);
                         const index = this.files.findIndex(f => f.filename === fileData.filename);
-                        
+
                         if (index >= 0) {
-                            // Update existing file
-                            this.files[index] = fileData;
+                            // Update existing file (splice for Vue reactivity)
+                            this.files.splice(index, 1, fileData);
                         } else {
-                            // Add new file
+                            // Add new file and re-sort
                             this.files.push(fileData);
-                            // Sort by filename
                             this.files.sort((a, b) => a.filename.localeCompare(b.filename));
                         }
                         
@@ -735,6 +774,10 @@
                     });
                 },
                 
+                retranscribe(file) {
+                    this.socket.emit('retranscribe', { filename: file.filename });
+                },
+
                 playAudio(file) {
                     if (this.currentFile && this.currentFile.filename === file.filename) {
                         // Toggle play/pause for current file
