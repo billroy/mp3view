@@ -147,21 +147,45 @@ def load_whisper_model():
     return whisper_model
 
 
-def transcribe_audio(file_path: Path) -> Optional[str]:
-    """Transcribe an audio file using local OpenAI Whisper"""
+def transcribe_audio(file_path: Path) -> dict:
+    """Transcribe an audio file using local OpenAI Whisper.
+    Returns dict with 'text', 'avg_logprob', 'no_speech_prob', 'language'."""
     try:
         logger.info(f"Starting transcription of {file_path.name}")
         model = load_whisper_model()
         result = model.transcribe(str(file_path))
         text = result["text"].strip()
+
+        # Compute quality metrics averaged across segments
+        segments = result.get("segments", [])
+        if segments:
+            avg_logprob = sum(s["avg_logprob"] for s in segments) / len(segments)
+            no_speech_prob = sum(s["no_speech_prob"] for s in segments) / len(segments)
+        else:
+            avg_logprob = 0.0
+            no_speech_prob = 0.0
+
+        language = result.get("language", "")
+        logger.info(f"Transcribed {file_path.name}: lang={language} avg_logprob={avg_logprob:.3f} no_speech={no_speech_prob:.3f}")
+
         if not text:
             logger.warning(f"Whisper returned empty text for {file_path.name}")
-            return "[Audio not intelligible]"
-        logger.info(f"Successfully transcribed {file_path.name}")
-        return text
+            text = "[Audio not intelligible]"
+
+        return {
+            'text': text,
+            'avg_logprob': round(avg_logprob, 3),
+            'no_speech_prob': round(no_speech_prob, 3),
+            'language': language,
+        }
     except Exception as e:
         logger.error(f"Error transcribing {file_path.name}: {e}")
-        return f"[Transcription error: {str(e)}]"
+        return {
+            'text': f"[Transcription error: {str(e)}]",
+            'avg_logprob': 0.0,
+            'no_speech_prob': 0.0,
+            'language': '',
+        }
 
 
 def transcription_worker():
@@ -184,7 +208,8 @@ def transcription_worker():
 
             # Perform transcription
             logger.info(f"[Worker] Starting transcribe_audio() for '{filename}'...")
-            transcription = transcribe_audio(file_path)
+            result = transcribe_audio(file_path)
+            transcription = result['text']
             logger.info(f"[Worker] transcribe_audio() returned for '{filename}': {len(transcription)} chars")
 
             # Save transcription to file
@@ -195,6 +220,9 @@ def transcription_worker():
             # Update registry
             if filename in file_registry:
                 file_registry[filename]['transcription'] = transcription
+                file_registry[filename]['avg_logprob'] = result['avg_logprob']
+                file_registry[filename]['no_speech_prob'] = result['no_speech_prob']
+                file_registry[filename]['language'] = result['language']
                 file_registry[filename]['status'] = 'completed'
 
                 # Broadcast update to all clients
