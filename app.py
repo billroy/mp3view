@@ -43,14 +43,24 @@ shutdown_event = threading.Event()
 
 class AudioFileHandler(FileSystemEventHandler):
     """Watches for new .mp3 files and queues them for transcription"""
-    
+
     def on_created(self, event):
         if event.is_directory:
             return
-        
+
         if event.src_path.endswith('.mp3'):
             logger.info(f"New audio file detected: {event.src_path}")
             file_path = Path(event.src_path)
+            self._queue_for_transcription(file_path)
+
+    def on_moved(self, event):
+        """Handle file renames/moves into the directory (e.g. macOS atomic writes)"""
+        if event.is_directory:
+            return
+
+        if event.dest_path.endswith('.mp3'):
+            logger.info(f"Audio file moved/renamed into directory: {event.dest_path}")
+            file_path = Path(event.dest_path)
             self._queue_for_transcription(file_path)
     
     def _queue_for_transcription(self, file_path: Path):
@@ -67,7 +77,7 @@ class AudioFileHandler(FileSystemEventHandler):
                 'added': datetime.now().isoformat()
             }
             # Notify clients of new file
-            socketio.emit('file_update', file_registry[filename], broadcast=True)
+            socketio.emit('file_update', file_registry[filename])
 
 
 def scan_existing_files():
@@ -162,8 +172,8 @@ def transcription_worker():
             # Update status to processing
             if filename in file_registry:
                 file_registry[filename]['status'] = 'processing'
-                socketio.emit('file_update', file_registry[filename], broadcast=True)
-            
+                socketio.emit('file_update', file_registry[filename])
+
             # Perform transcription
             transcription = transcribe_audio(file_path)
             
@@ -177,7 +187,7 @@ def transcription_worker():
                 file_registry[filename]['status'] = 'completed'
                 
                 # Broadcast update to all clients
-                socketio.emit('file_update', file_registry[filename], broadcast=True)
+                socketio.emit('file_update', file_registry[filename])
                 logger.info(f"Transcription complete and broadcasted for {filename}")
             
             transcription_queue.task_done()
