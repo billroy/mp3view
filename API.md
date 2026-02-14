@@ -371,6 +371,6 @@ def on_connect():
 def on_files_list(data):
     print(f"Received {len(data['files'])} files")
 
-sio.connect('http://localhost:5000')
+sio.connect('http://localhost:3000')
 sio.wait()
 ```

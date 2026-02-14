@@ -195,7 +195,7 @@ for i in range(num_workers):
 ### Manual Testing
 1. Run `python generate_test_audio.py --count 10`
 2. Start server: `python app.py`
-3. Open browser to http://localhost:5000
+3. Open browser to http://localhost:3000
 4. Watch files transcribe in real-time
 
 ### Multi-Client Testing

@@ -31,20 +31,20 @@ INFO - Found 0 MP3 files
 INFO - Using recordings directory: recordings
 INFO - Transcription worker started
 INFO - File watcher started on recordings
-INFO - Starting server on 127.0.0.1:5000
+INFO - Starting server on 0.0.0.0:3000
 ```
 
 ### Access the web interface:
 Open your browser to:
-- **On the same computer**: http://127.0.0.1:5000 or http://localhost:5000
-- **From another device on your network**: http://YOUR-IP-ADDRESS:5000
+- **On the same computer**: http://127.0.0.1:3000 or http://localhost:3000
+- **From another device on your network**: http://YOUR-IP-ADDRESS:3000
 
 To find your IP address (macOS):
 ```bash
 ifconfig | grep "inet " | grep -v 127.0.0.1
 ```
 
-Example: If your IP is `192.168.1.100`, access from any device on your network at `http://192.168.1.100:5000`
+Example: If your IP is `192.168.1.100`, access from any device on your network at `http://192.168.1.100:3000`
 
 ## Testing with Sample Audio
 
@@ -114,7 +114,7 @@ python app.py --debug
 ## Troubleshooting Quick Checks
 
 ### Server won't start?
-- Check if port 5000 is already in use: `lsof -i :5000`
+- Check if port 3000 is already in use: `lsof -i :3000`
 - Try a different port: `python app.py --port 8080`
 
 ### Files not transcribing?
@@ -125,6 +125,6 @@ python app.py --debug
 
 ### Browser not connecting?
 - Check that server is running
-- Verify URL is http://127.0.0.1:5000
+- Verify URL is http://127.0.0.1:3000
 - Check browser console (F12) for errors
 - Try refreshing the page

@@ -24,7 +24,7 @@ python app.py
 
 ### 3. Open Browser
 
-Navigate to: **http://127.0.0.1:5000**
+Navigate to: **http://127.0.0.1:3000**
 
 ## What Happens Next
 

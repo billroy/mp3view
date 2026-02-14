@@ -81,11 +81,11 @@ This will:
 - Create a `recordings` directory if it doesn't exist
 - Scan for existing .mp3 files
 - Start transcribing files without existing .txt files
-- Start the web server on http://0.0.0.0:5000 (accessible on your LAN)
+- Start the web server on http://0.0.0.0:3000 (accessible on your LAN)
 
 The server is accessible at:
-- **Local machine**: http://127.0.0.1:5000 or http://localhost:5000
-- **Other devices on your network**: http://YOUR-IP-ADDRESS:5000
+- **Local machine**: http://127.0.0.1:3000 or http://localhost:3000
+- **Other devices on your network**: http://YOUR-IP-ADDRESS:3000
 
 To find your IP address on macOS:
 ```bash
@@ -108,7 +108,7 @@ python app.py --host 127.0.0.1
 python app.py --debug
 
 # Combine options
-python app.py --recordings-dir ./audio --port 3000
+python app.py --recordings-dir ./audio --port 8080
 ```
 
 **Note**: By default, the server binds to `0.0.0.0` (all network interfaces), making it accessible from other devices on your LAN. To restrict to localhost only, use `--host 127.0.0.1`.

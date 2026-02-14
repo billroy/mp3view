@@ -57,7 +57,7 @@ def generate_test_audio(recordings_dir='recordings', count=5):
             subprocess.run(
                 ['ffmpeg', '-i', str(aiff_path), '-y', str(filepath)],
                 check=True,
-                capture_output=True,
+                stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
             
