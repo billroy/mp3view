@@ -174,7 +174,7 @@
         }
 
         .status-indicator.disconnected {
-            background: var(--text-muted);
+            background: var(--accent-secondary);
             animation: none;
         }
 
@@ -355,24 +355,28 @@
             padding: 0;
         }
 
-        .icon-button:hover {
-            border-color: var(--accent-primary);
-            color: var(--accent-primary);
-        }
-
         .icon-button:disabled {
             opacity: 0.3;
             cursor: not-allowed;
+            border-color: var(--border) !important;
+            color: var(--text-muted) !important;
         }
 
-        .icon-button.play-icon:hover:not(:disabled) {
-            border-color: var(--accent-primary);
-            color: var(--accent-primary);
-        }
+        @media (hover: hover) {
+            .icon-button:hover {
+                border-color: var(--accent-primary);
+                color: var(--accent-primary);
+            }
 
-        .icon-button.retranscribe-icon:hover:not(:disabled) {
-            border-color: var(--accent-tertiary);
-            color: var(--accent-tertiary);
+            .icon-button.play-icon:hover:not(:disabled) {
+                border-color: var(--accent-primary);
+                color: var(--accent-primary);
+            }
+
+            .icon-button.retranscribe-icon:hover:not(:disabled) {
+                border-color: var(--accent-tertiary);
+                color: var(--accent-tertiary);
+            }
         }
 
         /* Audio player */
@@ -625,7 +629,7 @@
                             :disabled="file.status === 'processing' || file.status === 'queued'"
                             title="Re-transcribe"
                         >
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 1v5h5"/><path d="M3.5 10a5.5 5.5 0 1 0 1.1-3.4L1 10"/></svg>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M21 8A9 9 0 0 0 5.64 5.64L3 8"/><path d="M3 22v-6h6"/><path d="M3 16a9 9 0 0 0 15.36 2.36L21 16"/></svg>
                         </button>
                     </div>
                 </div>
