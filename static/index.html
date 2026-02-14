@@ -158,6 +158,68 @@
             color: var(--text-muted);
         }
 
+        .toolbar-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-shrink: 0;
+        }
+
+        .toolbar-toggle-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            white-space: nowrap;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            left: 2px;
+            bottom: 2px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: rgba(0, 217, 255, 0.2);
+            border-color: var(--accent-primary);
+        }
+
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(16px);
+            background: var(--accent-primary);
+        }
+
         .toolbar-connection {
             display: flex;
             align-items: center;
@@ -593,6 +655,13 @@
                 <label for="filter-input">Filter:</label>
                 <input id="filter-input" type="text" v-model="filterText" placeholder="regex...">
             </div>
+            <div class="toolbar-toggle">
+                <span class="toolbar-toggle-label">Live</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" v-model="livePlayback">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
             <div class="toolbar-connection">
                 <div class="status-indicator" :class="{ disconnected: !connected }"></div>
             </div>
@@ -651,7 +720,7 @@
         </div>
 
         <!-- Audio Player -->
-        <div class="audio-player" v-if="currentFile">
+        <div class="audio-player" v-if="showPlayerBar">
             <div class="player-container">
                 <div class="player-header">
                     <div class="now-playing">{{ currentFile.filename }}</div>
@@ -682,16 +751,18 @@
                     </div>
                 </div>
             </div>
-
-            <audio
-                ref="audioElement"
-                @timeupdate="updateProgress"
-                @loadedmetadata="onAudioLoaded"
-                @ended="onAudioEnded"
-                @play="isPlaying = true"
-                @pause="isPlaying = false"
-            ></audio>
         </div>
+
+        <!-- Audio element always present for live playback -->
+        <audio
+            ref="audioElement"
+            @timeupdate="updateProgress"
+            @loadedmetadata="onAudioLoaded"
+            @ended="onAudioEnded"
+            @play="isPlaying = true"
+            @pause="isPlaying = false"
+            style="display: none;"
+        ></audio>
     </div>
 
     <script>
@@ -707,7 +778,11 @@
                     currentFile: null,
                     isPlaying: false,
                     currentTime: 0,
-                    duration: 0
+                    duration: 0,
+                    livePlayback: false,
+                    liveQueue: [],
+                    livePlaybackActive: false,
+                    initialLoadComplete: false
                 }
             },
 
@@ -748,6 +823,10 @@
                 progressPercent() {
                     if (this.duration === 0) return 0;
                     return (this.currentTime / this.duration) * 100;
+                },
+
+                showPlayerBar() {
+                    return this.currentFile && !this.livePlaybackActive;
                 }
             },
 
@@ -777,12 +856,18 @@
                     this.socket.on('files_list', (data) => {
                         console.log('Received files list:', data);
                         this.files = data.files.sort((a, b) => a.filename.localeCompare(b.filename));
+                        // Mark initial load complete after a short delay to ignore
+                        // any file_update events that arrive during startup
+                        setTimeout(() => {
+                            this.initialLoadComplete = true;
+                        }, 2000);
                     });
 
                     // File update notification (broadcast to all clients)
                     this.socket.on('file_update', (fileData) => {
                         console.log('File update received:', fileData);
                         const index = this.files.findIndex(f => f.filename === fileData.filename);
+                        const isNew = index < 0;
 
                         if (index >= 0) {
                             // Update existing file (splice for Vue reactivity)
@@ -796,6 +881,11 @@
                         // Update current file if it's being played
                         if (this.currentFile && this.currentFile.filename === fileData.filename) {
                             this.currentFile = fileData;
+                        }
+
+                        // Queue for live playback if enabled, past initial load, and this is a new file
+                        if (this.livePlayback && this.initialLoadComplete && isNew) {
+                            this.queueLivePlayback(fileData.filename);
                         }
                     });
 
@@ -816,6 +906,10 @@
                 },
 
                 playAudio(file) {
+                    // Cancel live playback if user manually selects a file
+                    this.livePlaybackActive = false;
+                    this.liveQueue = [];
+
                     if (this.currentFile && this.currentFile.filename === file.filename) {
                         // Toggle play/pause for current file
                         this.togglePlayPause();
@@ -862,24 +956,74 @@
 
                 updateProgress() {
                     const audio = this.$refs.audioElement;
-                    this.currentTime = audio.currentTime;
+                    if (audio) this.currentTime = audio.currentTime;
                 },
 
                 onAudioLoaded() {
                     const audio = this.$refs.audioElement;
-                    this.duration = audio.duration;
+                    if (audio) this.duration = audio.duration;
                 },
 
                 onAudioEnded() {
                     this.isPlaying = false;
+                    // If live playback is active, play next in queue
+                    if (this.livePlaybackActive) {
+                        this.playNextInLiveQueue();
+                    }
+                },
+
+                queueLivePlayback(filename) {
+                    // Add to queue in sorted position
+                    if (!this.liveQueue.includes(filename)) {
+                        this.liveQueue.push(filename);
+                        this.liveQueue.sort();
+                    }
+                    // Start processing queue if not already playing
+                    if (!this.livePlaybackActive) {
+                        this.playNextInLiveQueue();
+                    }
+                },
+
+                playNextInLiveQueue() {
+                    if (this.liveQueue.length === 0) {
+                        this.livePlaybackActive = false;
+                        this.currentFile = null;
+                        return;
+                    }
+
+                    this.livePlaybackActive = true;
+                    const filename = this.liveQueue.shift();
+                    const file = this.files.find(f => f.filename === filename);
+                    if (!file) {
+                        // File not found, skip to next
+                        this.playNextInLiveQueue();
+                        return;
+                    }
+
+                    // Scroll to the item
+                    this.$nextTick(() => {
+                        const idx = this.filteredFiles.findIndex(f => f.filename === filename);
+                        if (idx >= 0) {
+                            const items = document.querySelectorAll('.audio-item');
+                            if (items[idx]) {
+                                items[idx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        }
+                    });
+
+                    // Set currentFile for tracking but player bar won't show due to livePlaybackActive
+                    this.currentFile = file;
+                    this.socket.emit('request_audio_stream', { filename: file.filename });
                 },
 
                 closePlayer() {
                     const audio = this.$refs.audioElement;
-                    audio.pause();
+                    if (audio) audio.pause();
                     this.currentFile = null;
                     this.currentTime = 0;
                     this.duration = 0;
+                    this.livePlaybackActive = false;
+                    this.liveQueue = [];
                 },
 
                 formatTime(seconds) {
