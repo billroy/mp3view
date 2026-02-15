@@ -118,7 +118,7 @@ python app.py --debug
 - Try a different port: `python app.py --port 8080`
 
 ### Files not transcribing?
-- Check internet connection (Google Speech Recognition requires internet)
+- Check server logs for Whisper model errors (downloads ~140MB on first use)
 - Look at server console for error messages
 - Ensure audio file contains clear speech
 - Try with a simple test file first

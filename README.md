@@ -1,6 +1,6 @@
 # Audio Transcription Studio
 
-A real-time audio transcription application with a Flask backend and Vue 3 frontend. Automatically transcribes audio recordings using Google Speech Recognition and provides a sleek, modern interface for reviewing and playing back recordings.
+A real-time audio transcription application with a Flask backend and Vue 3 frontend. Automatically transcribes audio recordings using OpenAI Whisper (running locally) and provides a sleek, modern interface for reviewing and playing back recordings.
 
 ## Features
 
@@ -17,8 +17,7 @@ A real-time audio transcription application with a Flask backend and Vue 3 front
 - Flask web server with SocketIO for bidirectional communication
 - Watchdog for file system monitoring (macOS optimized)
 - Background worker thread for transcription processing
-- Google Speech Recognition for audio-to-text conversion
-- Pydub for audio format conversion
+- OpenAI Whisper for local audio-to-text transcription
 
 ### Frontend (Vue 3)
 - No build step - uses Vue 3 via CDN
@@ -41,7 +40,7 @@ The application uses a command-based architecture over SocketIO:
 ## Prerequisites
 
 - Python 3.8+
-- ffmpeg (required by pydub for audio conversion)
+- ffmpeg (required by Whisper for audio decoding)
 - macOS (for file watching - can be adapted for other platforms)
 
 ### Install ffmpeg on macOS
@@ -175,12 +174,11 @@ audio-transcription-studio/
 
 1. New .mp3 file detected or queued
 2. Status updated to "processing"
-3. MP3 converted to WAV format (required by speech recognition)
-4. Google Speech Recognition processes the audio
-5. Text result saved to .txt file
+3. Whisper model transcribes the audio locally (lazy-loaded on first use)
+4. Text result saved to .txt file
+5. Quality metrics recorded (language, avg_logprob, no_speech_prob)
 6. Status updated to "completed"
 7. All clients notified of the update
-8. Temporary WAV file cleaned up
 
 ## Troubleshooting
 
@@ -190,10 +188,10 @@ Install requirements: `pip install -r requirements.txt`
 ### "ffmpeg not found"
 Install ffmpeg: `brew install ffmpeg` (macOS)
 
-### "Could not request results from speech recognition service"
-- Check internet connection (Google Speech Recognition requires internet)
+### Transcription errors
 - Ensure audio file is clear and contains speech
-- Try with a different audio file
+- Check server logs for Whisper model loading errors
+- The Whisper 'base' model (~140MB) downloads automatically on first use
 
 ### Files not appearing
 - Check the recordings directory path
@@ -207,15 +205,14 @@ Install ffmpeg: `brew install ffmpeg` (macOS)
 
 ## Customization
 
-### Change Transcription Engine
+### Change Whisper Model
 
-The application uses Google Speech Recognition by default. To use a different engine, modify the `transcribe_audio()` function in `app.py`. SpeechRecognition library supports:
-- Sphinx (offline)
-- Google Cloud Speech
-- Wit.ai
-- Microsoft Bing
-- Houndify
-- IBM Speech to Text
+The application uses the Whisper 'base' model by default. To use a different model size, modify the `load_whisper_model()` function in `app.py`. Available models:
+- `tiny` (fastest, least accurate, ~39MB)
+- `base` (default, ~140MB)
+- `small` (~460MB)
+- `medium` (~1.5GB)
+- `large` (most accurate, ~2.9GB)
 
 ### Adjust UI Styling
 
@@ -229,7 +226,7 @@ Edit `/static/index.html` to customize:
 
 To support additional audio formats beyond .mp3:
 1. Update file detection in `AudioFileHandler.on_created()`
-2. Ensure pydub can handle the format (may require additional codecs)
+2. Ensure Whisper/ffmpeg can handle the format
 
 ## Performance Notes
 

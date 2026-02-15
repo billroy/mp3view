@@ -6,10 +6,10 @@ A production-ready Flask/Vue 3 application for automatic audio transcription wit
 
 ## Key Technologies
 
-- **Backend:** Flask, Flask-SocketIO, Watchdog, SpeechRecognition, Pydub
+- **Backend:** Flask, Flask-SocketIO, Watchdog, OpenAI Whisper
 - **Frontend:** Vue 3 (CDN), SocketIO Client, native HTML5 audio
 - **Communication:** SocketIO with JSON command/response pattern
-- **Transcription:** Google Speech Recognition API
+- **Transcription:** OpenAI Whisper (local, offline)
 - **Platform:** macOS (adaptable to Linux/Windows)
 
 ## Architecture Highlights
@@ -120,7 +120,7 @@ The UI follows a **neo-brutalist technical aesthetic** with:
 - **Memory Usage:** In-memory registry (consider DB for 50k+ files)
 
 ### Bottlenecks
-- Transcription speed limited by Google Speech Recognition API
+- Transcription speed limited by Whisper model and CPU/GPU performance
 - Single worker thread (can be parallelized if needed)
 - Network bandwidth for audio streaming to multiple clients
 
@@ -155,7 +155,7 @@ The UI follows a **neo-brutalist technical aesthetic** with:
 ### Change Transcription Service
 Edit `transcribe_audio()` function in `app.py`:
 ```python
-# Current: Google Speech Recognition
+# Current: OpenAI Whisper (local)
 text = recognizer.recognize_google(audio_data)
 
 # Switch to Sphinx (offline)
@@ -249,5 +249,5 @@ Built with:
 - Flask by Pallets
 - Vue 3 by Evan You
 - Socket.IO by Guillermo Rauch
-- SpeechRecognition by Anthony Zhang
+- OpenAI Whisper by OpenAI
 - Fonts by IBM and Google Fonts

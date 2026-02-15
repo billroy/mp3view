@@ -376,7 +376,10 @@ def upload_recording():
         counter += 1
 
     # Save uploaded audio to a temp file, then convert to MP3 via ffmpeg
-    with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as tmp:
+    # Determine suffix from uploaded filename (browser sends .webm or .mp4)
+    upload_name = audio_file.filename or 'recording.webm'
+    suffix = '.mp4' if upload_name.endswith('.mp4') else '.webm'
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         audio_file.save(tmp)
         tmp_path = tmp.name
 
@@ -457,6 +460,11 @@ def main():
         action='store_true',
         help='Enable debug mode'
     )
+    parser.add_argument(
+        '--ssl',
+        action='store_true',
+        help='Enable HTTPS with a self-signed certificate (required for microphone on non-localhost devices like iPad)'
+    )
 
     args = parser.parse_args()
 
@@ -489,22 +497,48 @@ def main():
     observer = start_file_watcher()
     
     try:
+        # Set up SSL if requested (needed for microphone access from non-localhost devices)
+        ssl_context = None
+        protocol = 'http'
+        if args.ssl:
+            import ssl
+            cert_file = Path(__file__).parent / 'cert.pem'
+            key_file = Path(__file__).parent / 'key.pem'
+            if not cert_file.exists() or not key_file.exists():
+                logger.info("Generating self-signed SSL certificate...")
+                subprocess.run([
+                    'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
+                    '-keyout', str(key_file), '-out', str(cert_file),
+                    '-days', '365', '-nodes',
+                    '-subj', '/CN=localhost'
+                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+                logger.info(f"SSL certificate created: {cert_file}")
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ssl_context.load_cert_chain(str(cert_file), str(key_file))
+            protocol = 'https'
+            logger.info("HTTPS enabled (self-signed certificate)")
+            logger.info("NOTE: You will need to accept the browser security warning on first visit")
+
         # Start server
         logger.info(f"Starting server on {args.host}:{args.port}")
         if args.host == '0.0.0.0':
             logger.info(f"Server accessible at:")
-            logger.info(f"  - Local: http://127.0.0.1:{args.port}")
-            logger.info(f"  - Network: http://<your-ip-address>:{args.port}")
+            logger.info(f"  - Local: {protocol}://127.0.0.1:{args.port}")
+            logger.info(f"  - Network: {protocol}://<your-ip-address>:{args.port}")
             logger.info(f"  Find your IP with: ifconfig | grep 'inet ' | grep -v 127.0.0.1")
         else:
-            logger.info(f"Open http://{args.host}:{args.port} in your browser")
-        socketio.run(
-            app,
+            logger.info(f"Open {protocol}://{args.host}:{args.port} in your browser")
+
+        run_kwargs = dict(
             host=args.host,
             port=args.port,
             debug=args.debug,
             allow_unsafe_werkzeug=True
         )
+        if ssl_context:
+            run_kwargs['ssl_context'] = ssl_context
+
+        socketio.run(app, **run_kwargs)
     except KeyboardInterrupt:
         logger.info("Shutting down...")
     finally:

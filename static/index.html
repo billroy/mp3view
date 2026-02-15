@@ -445,6 +445,10 @@
         .record-button {
             color: #ff4444 !important;
             border-color: #ff4444 !important;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
         }
 
         .record-button.recording {
@@ -452,6 +456,23 @@
             color: #fff !important;
             border-color: #ff4444 !important;
             animation: record-pulse 1s ease infinite;
+        }
+
+        .record-button.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* Larger touch target on touch devices */
+        @media (pointer: coarse) {
+            .record-button {
+                width: 44px;
+                height: 44px;
+            }
+            .record-button svg {
+                width: 18px;
+                height: 18px;
+            }
         }
 
         @keyframes record-pulse {
@@ -682,19 +703,21 @@
             </div>
             <button
                 class="icon-button record-button"
-                :class="{ recording: isRecording }"
-                @mousedown.prevent="startRecording"
-                @mouseup.prevent="stopRecording"
-                @mouseleave="stopRecording"
-                @touchstart.prevent="startRecording"
-                @touchend.prevent="stopRecording"
-                @touchcancel="stopRecording"
-                :title="isRecording ? 'Recording... ' + Math.floor(recordingElapsed) + 's' : 'Hold to record'"
+                :class="{ recording: isRecording, disabled: !canRecord }"
+                @mousedown.prevent="onRecordMouseDown"
+                @mouseup.prevent="onRecordMouseUp"
+                @mouseleave="onRecordMouseLeave"
+                @touchstart="onRecordTouchStart"
+                @touchend="onRecordTouchEnd"
+                @touchcancel="onRecordTouchEnd"
+                @contextmenu.prevent
+                :title="!canRecord ? 'Recording not supported (requires HTTPS)' : isRecording ? 'Recording... ' + Math.floor(recordingElapsed) + 's' : 'Hold to record'"
             >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                     <circle cx="12" cy="12" r="10"/>
                 </svg>
             </button>
+            <span v-if="recordingError" class="recording-error" style="color: #ff4444; font-size: 0.65rem; margin-left: 4px; white-space: nowrap;">{{ recordingError }}</span>
             <div class="toolbar-connection">
                 <div class="status-indicator" :class="{ disconnected: !connected }"></div>
             </div>
@@ -824,7 +847,10 @@
                     recordingTimer: null,
                     recordingStartTime: null,
                     recordingElapsed: 0,
-                    recordingButtonPressed: false
+                    recordingButtonPressed: false,
+                    _isTouching: false,
+                    recordingError: '',
+                    canRecord: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (typeof MediaRecorder !== 'undefined'))
                 }
             },
 
@@ -874,6 +900,19 @@
 
             mounted() {
                 this.initSocket();
+                // Log recording capability for debugging
+                console.log('Recording support:', {
+                    mediaDevices: !!navigator.mediaDevices,
+                    getUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+                    MediaRecorder: typeof MediaRecorder !== 'undefined',
+                    isSecureContext: window.isSecureContext,
+                    protocol: location.protocol,
+                    hostname: location.hostname,
+                    canRecord: this.canRecord
+                });
+                if (!this.canRecord && !window.isSecureContext) {
+                    console.warn('Recording disabled: page is not a secure context (HTTPS required for microphone access on non-localhost)');
+                }
             },
 
             methods: {
@@ -1075,61 +1114,161 @@
                     this.liveQueue = [];
                 },
 
-                async startRecording() {
+                // Record button event handlers — separate mouse and touch
+                // to prevent ghost events on touch devices
+                onRecordMouseDown() {
+                    if (this._isTouching) return; // ignore mouse events from touch
+                    this.startRecording();
+                },
+                onRecordMouseUp() {
+                    if (this._isTouching) return;
+                    this.stopRecording();
+                },
+                onRecordMouseLeave() {
+                    if (this._isTouching) return;
+                    if (this.isRecording) this.stopRecording();
+                },
+                onRecordTouchStart(e) {
+                    e.preventDefault(); // prevent scroll/zoom but called AFTER getUserMedia sees gesture
+                    this._isTouching = true;
+                    this.startRecording();
+                },
+                onRecordTouchEnd(e) {
+                    e.preventDefault();
+                    this.stopRecording();
+                    // Clear touch flag after a delay to block ghost mouse events
+                    setTimeout(() => { this._isTouching = false; }, 400);
+                },
+
+                startRecording() {
+                    if (!this.canRecord) {
+                        this.recordingError = 'Recording requires HTTPS or localhost';
+                        setTimeout(() => { this.recordingError = ''; }, 4000);
+                        return;
+                    }
                     if (this.isRecording) return;
+                    this.recordingError = '';
                     this.recordingButtonPressed = true;
 
-                    try {
-                        this.recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    } catch (err) {
-                        console.error('Microphone access denied:', err);
-                        this.recordingButtonPressed = false;
+                    // If we already have mic permission (stream still open), start immediately
+                    if (this.recordingStream) {
+                        this._beginRecordingSegment();
                         return;
                     }
 
-                    this._beginRecordingSegment();
+                    // Request mic — getUserMedia MUST be called synchronously from
+                    // user gesture handler. On iOS Safari, any async gap (await, setTimeout)
+                    // between the touch event and getUserMedia will cause it to be rejected.
+                    // We use .then() to handle the result without breaking the call chain.
+                    var self = this;
+                    try {
+                        navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+                            self.recordingStream = stream;
+                            // Only start if button is still held (user may have released during permission prompt)
+                            if (self.recordingButtonPressed) {
+                                self._beginRecordingSegment();
+                            } else {
+                                stream.getTracks().forEach(function(t) { t.stop(); });
+                                self.recordingStream = null;
+                            }
+                        }).catch(function(err) {
+                            console.error('Microphone access denied:', err);
+                            self.recordingError = err.name === 'NotAllowedError' ? 'Mic permission denied' :
+                                                  err.name === 'NotFoundError' ? 'No microphone found' :
+                                                  'Mic error: ' + err.message;
+                            setTimeout(function() { self.recordingError = ''; }, 4000);
+                            self.recordingButtonPressed = false;
+                        });
+                    } catch (err) {
+                        console.error('getUserMedia exception:', err);
+                        this.recordingError = 'Mic not available';
+                        setTimeout(() => { this.recordingError = ''; }, 4000);
+                        this.recordingButtonPressed = false;
+                    }
                 },
 
                 _beginRecordingSegment() {
                     this.recordingChunks = [];
-                    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                        ? 'audio/webm;codecs=opus'
-                        : 'audio/webm';
 
-                    this.mediaRecorder = new MediaRecorder(this.recordingStream, { mimeType });
+                    // Determine best supported mime type
+                    // Safari/iOS: typically supports audio/mp4, NOT audio/webm
+                    var mimeType = '';
+                    try {
+                        if (typeof MediaRecorder.isTypeSupported === 'function') {
+                            // Try mp4 first for Safari/iOS compatibility
+                            if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                                mimeType = 'audio/mp4';
+                            } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                                mimeType = 'audio/webm;codecs=opus';
+                            } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                                mimeType = 'audio/webm';
+                            }
+                            // else leave empty — let browser pick default
+                        }
+                    } catch (e) {
+                        console.warn('isTypeSupported check failed:', e);
+                    }
 
-                    this.mediaRecorder.ondataavailable = (e) => {
-                        if (e.data.size > 0) {
-                            this.recordingChunks.push(e.data);
+                    var options = mimeType ? { mimeType: mimeType } : {};
+                    var self = this;
+                    try {
+                        this.mediaRecorder = new MediaRecorder(this.recordingStream, options);
+                    } catch (e) {
+                        console.error('MediaRecorder creation failed with options', options, e);
+                        // Retry with no options
+                        try {
+                            this.mediaRecorder = new MediaRecorder(this.recordingStream);
+                        } catch (e2) {
+                            console.error('MediaRecorder creation failed completely:', e2);
+                            this.recordingError = 'Recording not supported on this browser';
+                            setTimeout(function() { self.recordingError = ''; }, 4000);
+                            this.recordingButtonPressed = false;
+                            this._releaseStream();
+                            return;
+                        }
+                    }
+                    var activeMimeType = this.mediaRecorder.mimeType || mimeType || 'audio/webm';
+
+                    this.mediaRecorder.ondataavailable = function(e) {
+                        if (e.data && e.data.size > 0) {
+                            self.recordingChunks.push(e.data);
                         }
                     };
 
-                    this.mediaRecorder.onstop = () => {
-                        const blob = new Blob(this.recordingChunks, { type: mimeType });
+                    this.mediaRecorder.onerror = function(e) {
+                        console.error('MediaRecorder error:', e);
+                        self.recordingError = 'Recording error';
+                        setTimeout(function() { self.recordingError = ''; }, 4000);
+                        self.stopRecording();
+                    };
+
+                    this.mediaRecorder.onstop = function() {
+                        var blob = new Blob(self.recordingChunks, { type: activeMimeType });
                         if (blob.size > 0) {
-                            this.sendRecording(blob);
+                            self.sendRecording(blob, activeMimeType);
                         }
 
                         // If button is still held, start a new segment (auto-split)
-                        if (this.recordingButtonPressed) {
-                            this._beginRecordingSegment();
+                        if (self.recordingButtonPressed) {
+                            self._beginRecordingSegment();
                         } else {
-                            this._releaseStream();
+                            self._releaseStream();
                         }
                     };
 
+                    // Use timeslice of 1000ms; some iOS versions need this
                     this.mediaRecorder.start(1000);
                     this.isRecording = true;
                     this.recordingStartTime = Date.now();
                     this.recordingElapsed = 0;
 
                     // Timer for elapsed display and max duration enforcement
-                    this.recordingTimer = setInterval(() => {
-                        this.recordingElapsed = (Date.now() - this.recordingStartTime) / 1000;
-                        if (this.recordingElapsed >= this.maxRecordSeconds) {
-                            clearInterval(this.recordingTimer);
-                            if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-                                this.mediaRecorder.stop();
+                    this.recordingTimer = setInterval(function() {
+                        self.recordingElapsed = (Date.now() - self.recordingStartTime) / 1000;
+                        if (self.recordingElapsed >= self.maxRecordSeconds) {
+                            clearInterval(self.recordingTimer);
+                            if (self.mediaRecorder && self.mediaRecorder.state !== 'inactive') {
+                                self.mediaRecorder.stop();
                             }
                         }
                     }, 200);
@@ -1150,27 +1289,36 @@
 
                 _releaseStream() {
                     if (this.recordingStream) {
-                        this.recordingStream.getTracks().forEach(t => t.stop());
+                        this.recordingStream.getTracks().forEach(function(t) { t.stop(); });
                         this.recordingStream = null;
                     }
                     this.isRecording = false;
                     this.recordingElapsed = 0;
                 },
 
-                async sendRecording(blob) {
-                    const formData = new FormData();
-                    formData.append('audio', blob, 'recording.webm');
-                    try {
-                        const resp = await fetch('/upload_recording', { method: 'POST', body: formData });
-                        const data = await resp.json();
-                        if (resp.ok) {
-                            console.log('Recording uploaded:', data.filename);
-                        } else {
-                            console.error('Upload failed:', data.error);
-                        }
-                    } catch (err) {
-                        console.error('Upload error:', err);
-                    }
+                sendRecording(blob, mimeType) {
+                    // Determine file extension from mime type for server-side conversion
+                    var ext = (mimeType && mimeType.indexOf('mp4') !== -1) ? '.mp4' : '.webm';
+                    var formData = new FormData();
+                    formData.append('audio', blob, 'recording' + ext);
+                    var self = this;
+                    fetch('/upload_recording', { method: 'POST', body: formData })
+                        .then(function(resp) {
+                            return resp.json().then(function(data) {
+                                if (resp.ok) {
+                                    console.log('Recording uploaded:', data.filename);
+                                } else {
+                                    console.error('Upload failed:', data.error);
+                                    self.recordingError = 'Upload failed';
+                                    setTimeout(function() { self.recordingError = ''; }, 4000);
+                                }
+                            });
+                        })
+                        .catch(function(err) {
+                            console.error('Upload error:', err);
+                            self.recordingError = 'Upload error';
+                            setTimeout(function() { self.recordingError = ''; }, 4000);
+                        });
                 },
 
                 formatTime(seconds) {

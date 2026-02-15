@@ -95,15 +95,14 @@ python app.py --debug
 - Python 3.8+
 - ffmpeg (for audio conversion)
 - macOS (for file watching - adaptable to other platforms)
-- Internet connection (for Google Speech Recognition)
+- Internet connection not required (Whisper runs locally)
 
 ## Architecture
 
 **Backend:**
 - Flask + SocketIO for server
 - Watchdog for file monitoring
-- SpeechRecognition for transcription
-- Pydub for audio conversion
+- OpenAI Whisper for local transcription
 
 **Frontend:**
 - Vue 3 (no build required)
