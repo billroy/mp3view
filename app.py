@@ -13,7 +13,9 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from flask import Flask, send_from_directory
+import subprocess
+import tempfile
+from flask import Flask, send_from_directory, request, jsonify
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from watchdog.observers import Observer
@@ -30,11 +32,13 @@ logger = logging.getLogger(__name__)
 # Flask app setup
 app = Flask(__name__, static_folder='static')
 app.config['SECRET_KEY'] = 'your-secret-key-change-in-production'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Global state
 RECORDINGS_DIR = Path('recordings')
+MAX_RECORD_SECONDS = 60
 transcription_queue = queue.Queue()
 file_registry: Dict[str, dict] = {}
 shutdown_event = threading.Event()
@@ -331,6 +335,12 @@ def handle_retranscribe(data):
     logger.info(f"[Retranscribe] Queued '{filename}' for re-transcription")
 
 
+@socketio.on('get_config')
+def handle_get_config(data=None):
+    """Send server configuration to requesting client"""
+    emit('config', {'max_record_seconds': MAX_RECORD_SECONDS})
+
+
 # Flask routes
 @app.route('/')
 def index():
@@ -343,6 +353,63 @@ def index():
 def serve_audio(filename):
     """Serve audio files"""
     return send_from_directory(RECORDINGS_DIR, filename)
+
+
+@app.route('/upload_recording', methods=['POST'])
+def upload_recording():
+    """Receive recorded audio from browser, convert to MP3, save, and queue for transcription."""
+    if 'audio' not in request.files:
+        return jsonify({'error': 'No audio file provided'}), 400
+
+    audio_file = request.files['audio']
+
+    # Generate filename from current server time
+    now = datetime.now()
+    filename = now.strftime('%y%m%d_%H%M%S') + '_Recording.mp3'
+    mp3_path = RECORDINGS_DIR / filename
+
+    # Avoid filename collision (if multiple uploads in same second)
+    counter = 1
+    while mp3_path.exists():
+        filename = now.strftime('%y%m%d_%H%M%S') + f'_Recording_{counter}.mp3'
+        mp3_path = RECORDINGS_DIR / filename
+        counter += 1
+
+    # Save uploaded audio to a temp file, then convert to MP3 via ffmpeg
+    with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as tmp:
+        audio_file.save(tmp)
+        tmp_path = tmp.name
+
+    try:
+        result = subprocess.run(
+            ['ffmpeg', '-i', tmp_path, '-y', '-codec:a', 'libmp3lame', '-qscale:a', '2', str(mp3_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=30
+        )
+        if result.returncode != 0:
+            logger.error(f"ffmpeg conversion failed for {filename}")
+            return jsonify({'error': 'Audio conversion failed'}), 500
+    except subprocess.TimeoutExpired:
+        logger.error(f"ffmpeg conversion timed out for {filename}")
+        return jsonify({'error': 'Audio conversion timed out'}), 500
+    finally:
+        os.unlink(tmp_path)
+
+    # Register file and broadcast immediately (short-circuits watchdog)
+    size_kb = round(mp3_path.stat().st_size / 1024)
+    file_registry[filename] = {
+        'filename': filename,
+        'size_kb': size_kb,
+        'transcription': None,
+        'status': 'queued',
+        'added': datetime.now().isoformat()
+    }
+    socketio.emit('file_update', file_registry[filename])
+    transcription_queue.put(mp3_path)
+
+    logger.info(f"Recording uploaded and saved: {filename} ({size_kb}k)")
+    return jsonify({'filename': filename}), 200
 
 
 def start_file_watcher():
@@ -380,15 +447,23 @@ def main():
         help='Port to bind to (default: 3000)'
     )
     parser.add_argument(
+        '--max-record-seconds',
+        type=int,
+        default=60,
+        help='Maximum seconds per recording segment (default: 60)'
+    )
+    parser.add_argument(
         '--debug',
         action='store_true',
         help='Enable debug mode'
     )
-    
+
     args = parser.parse_args()
-    
-    # Set recordings directory
+
+    # Set recordings directory and config
     RECORDINGS_DIR = Path(args.recordings_dir)
+    global MAX_RECORD_SECONDS
+    MAX_RECORD_SECONDS = args.max_record_seconds
     logger.info(f"Using recordings directory: {RECORDINGS_DIR}")
     
     # Verify static folder exists

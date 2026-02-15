@@ -441,6 +441,24 @@
             }
         }
 
+        /* Record button */
+        .record-button {
+            color: #ff4444 !important;
+            border-color: #ff4444 !important;
+        }
+
+        .record-button.recording {
+            background: #ff4444;
+            color: #fff !important;
+            border-color: #ff4444 !important;
+            animation: record-pulse 1s ease infinite;
+        }
+
+        @keyframes record-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.5); }
+            50% { box-shadow: 0 0 0 6px rgba(255, 68, 68, 0); }
+        }
+
         /* Audio player */
         .audio-player {
             position: fixed;
@@ -662,6 +680,21 @@
                     <span class="toggle-slider"></span>
                 </label>
             </div>
+            <button
+                class="icon-button record-button"
+                :class="{ recording: isRecording }"
+                @mousedown.prevent="startRecording"
+                @mouseup.prevent="stopRecording"
+                @mouseleave="stopRecording"
+                @touchstart.prevent="startRecording"
+                @touchend.prevent="stopRecording"
+                @touchcancel="stopRecording"
+                :title="isRecording ? 'Recording... ' + Math.floor(recordingElapsed) + 's' : 'Hold to record'"
+            >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="10"/>
+                </svg>
+            </button>
             <div class="toolbar-connection">
                 <div class="status-indicator" :class="{ disconnected: !connected }"></div>
             </div>
@@ -782,7 +815,16 @@
                     livePlayback: false,
                     liveQueue: [],
                     livePlaybackActive: false,
-                    initialLoadComplete: false
+                    initialLoadComplete: false,
+                    isRecording: false,
+                    mediaRecorder: null,
+                    recordingStream: null,
+                    recordingChunks: [],
+                    maxRecordSeconds: 60,
+                    recordingTimer: null,
+                    recordingStartTime: null,
+                    recordingElapsed: 0,
+                    recordingButtonPressed: false
                 }
             },
 
@@ -843,8 +885,9 @@
                     this.socket.on('connect', () => {
                         console.log('Connected to server');
                         this.connected = true;
-                        // Request initial file list
+                        // Request initial file list and config
                         this.socket.emit('get_files');
+                        this.socket.emit('get_config');
                     });
 
                     this.socket.on('disconnect', () => {
@@ -893,6 +936,12 @@
                     this.socket.on('audio_stream_ready', (data) => {
                         console.log('Audio stream ready:', data);
                         this.loadAudio(data.url);
+                    });
+
+                    // Config response
+                    this.socket.on('config', (data) => {
+                        console.log('Config received:', data);
+                        this.maxRecordSeconds = data.max_record_seconds;
                     });
 
                     // Error handling
@@ -1024,6 +1073,104 @@
                     this.duration = 0;
                     this.livePlaybackActive = false;
                     this.liveQueue = [];
+                },
+
+                async startRecording() {
+                    if (this.isRecording) return;
+                    this.recordingButtonPressed = true;
+
+                    try {
+                        this.recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    } catch (err) {
+                        console.error('Microphone access denied:', err);
+                        this.recordingButtonPressed = false;
+                        return;
+                    }
+
+                    this._beginRecordingSegment();
+                },
+
+                _beginRecordingSegment() {
+                    this.recordingChunks = [];
+                    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                        ? 'audio/webm;codecs=opus'
+                        : 'audio/webm';
+
+                    this.mediaRecorder = new MediaRecorder(this.recordingStream, { mimeType });
+
+                    this.mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) {
+                            this.recordingChunks.push(e.data);
+                        }
+                    };
+
+                    this.mediaRecorder.onstop = () => {
+                        const blob = new Blob(this.recordingChunks, { type: mimeType });
+                        if (blob.size > 0) {
+                            this.sendRecording(blob);
+                        }
+
+                        // If button is still held, start a new segment (auto-split)
+                        if (this.recordingButtonPressed) {
+                            this._beginRecordingSegment();
+                        } else {
+                            this._releaseStream();
+                        }
+                    };
+
+                    this.mediaRecorder.start(1000);
+                    this.isRecording = true;
+                    this.recordingStartTime = Date.now();
+                    this.recordingElapsed = 0;
+
+                    // Timer for elapsed display and max duration enforcement
+                    this.recordingTimer = setInterval(() => {
+                        this.recordingElapsed = (Date.now() - this.recordingStartTime) / 1000;
+                        if (this.recordingElapsed >= this.maxRecordSeconds) {
+                            clearInterval(this.recordingTimer);
+                            if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                                this.mediaRecorder.stop();
+                            }
+                        }
+                    }, 200);
+                },
+
+                stopRecording() {
+                    this.recordingButtonPressed = false;
+                    if (!this.isRecording) return;
+                    this.isRecording = false;
+
+                    clearInterval(this.recordingTimer);
+                    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                        this.mediaRecorder.stop();
+                    } else {
+                        this._releaseStream();
+                    }
+                },
+
+                _releaseStream() {
+                    if (this.recordingStream) {
+                        this.recordingStream.getTracks().forEach(t => t.stop());
+                        this.recordingStream = null;
+                    }
+                    this.isRecording = false;
+                    this.recordingElapsed = 0;
+                },
+
+                async sendRecording(blob) {
+                    const formData = new FormData();
+                    formData.append('audio', blob, 'recording.webm');
+                    try {
+                        const resp = await fetch('/upload_recording', { method: 'POST', body: formData });
+                        const data = await resp.json();
+                        if (resp.ok) {
+                            console.log('Recording uploaded:', data.filename);
+                        } else {
+                            console.error('Upload failed:', data.error);
+                        }
+                    } catch (err) {
+                        console.error('Upload error:', err);
+                    }
                 },
 
                 formatTime(seconds) {
