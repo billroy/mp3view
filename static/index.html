@@ -707,9 +707,9 @@
                 @mousedown.prevent="onRecordMouseDown"
                 @mouseup.prevent="onRecordMouseUp"
                 @mouseleave="onRecordMouseLeave"
-                @touchstart="onRecordTouchStart"
-                @touchend="onRecordTouchEnd"
-                @touchcancel="onRecordTouchEnd"
+                @touchstart.prevent="onRecordTouchStart"
+                @touchend.prevent="onRecordTouchEnd"
+                @touchcancel.prevent="onRecordTouchEnd"
                 @contextmenu.prevent
                 :title="!canRecord ? 'Recording not supported (requires HTTPS)' : isRecording ? 'Recording... ' + Math.floor(recordingElapsed) + 's' : 'Hold to record'"
             >
@@ -1129,7 +1129,7 @@
                     if (this.isRecording) this.stopRecording();
                 },
                 onRecordTouchStart(e) {
-                    e.preventDefault(); // prevent scroll/zoom but called AFTER getUserMedia sees gesture
+                    e.preventDefault();
                     this._isTouching = true;
                     this.startRecording();
                 },
