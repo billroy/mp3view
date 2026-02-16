@@ -39,7 +39,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # Global state
 RECORDINGS_DIR = Path('recordings')
 MAX_RECORD_SECONDS = 60
-transcription_queue = queue.Queue()
+transcription_queue = queue.PriorityQueue()
 file_registry: Dict[str, dict] = {}
 shutdown_event = threading.Event()
 whisper_model = None
@@ -111,7 +111,7 @@ def scan_existing_files():
         RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
         return
     
-    mp3_files = list(RECORDINGS_DIR.glob('*.mp3'))
+    mp3_files = sorted(RECORDINGS_DIR.glob('*.mp3'))
     logger.info(f"Found {len(mp3_files)} MP3 files")
     
     for mp3_file in mp3_files:
