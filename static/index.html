@@ -73,7 +73,7 @@
             top: 0;
             left: 0;
             right: 0;
-            height: var(--toolbar-height);
+            min-height: var(--toolbar-height);
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border);
             z-index: 1000;
@@ -84,8 +84,18 @@
             backdrop-filter: blur(20px);
         }
 
+        /* On wide screens, the controls wrapper is transparent to flex layout */
+        .toolbar-controls-row {
+            display: contents;
+        }
+
+        /* Keep connection dot at the far right on wide screens */
+        .toolbar-connection {
+            margin-left: auto;
+        }
+
         .toolbar-title {
-            font-family: 'Spectral', serif;
+            font-family: 'Inter', sans-serif;
             font-size: 1.25rem;
             font-weight: 700;
             background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
@@ -162,7 +172,6 @@
             display: flex;
             align-items: center;
             gap: 0.4rem;
-            margin-left: auto;
             flex: 0 1 300px;
         }
 
@@ -843,21 +852,79 @@
             to { transform: rotate(360deg); }
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
+        /* Responsive: two-row toolbar (iPad mini 6 landscape is ~1133 CSS px) */
+        @media (max-width: 1200px) {
             .toolbar {
-                padding: 0 1rem;
-                gap: 0.75rem;
+                display: grid;
+                grid-template-columns: 1fr auto;
+                grid-template-rows: auto auto;
+                padding: 0.4rem 1rem;
+                gap: 0.3rem 0.75rem;
+                min-height: auto;
             }
 
+            /* Row 1: title + connection dot */
             .toolbar-title {
+                grid-column: 1;
+                grid-row: 1;
                 font-size: 1rem;
+                align-self: center;
+                /* Re-assert gradient for iOS Safari in grid context */
+                background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                color: transparent;
+                display: inline-block;
+                width: fit-content;
             }
 
+            .toolbar-connection {
+                grid-column: 2;
+                grid-row: 1;
+                margin-left: 0;
+                align-self: center;
+            }
+
+            /* Row 2: controls become a flex row spanning full width */
+            .toolbar-controls-row {
+                grid-column: 1 / -1;
+                grid-row: 2;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            /* Compact stats: hide labels, tighten gaps */
+            .toolbar-stats {
+                gap: 0.5rem;
+            }
+
+            .toolbar-stat-label {
+                display: none;
+            }
+
+            .toolbar-stat-value {
+                font-size: 0.85rem;
+            }
+
+            /* Let filter shrink to fit */
             .toolbar-filter {
-                flex: 0 1 150px;
+                flex: 1 1 60px;
+                min-width: 0;
             }
 
+            .toolbar-filter label {
+                display: none;
+            }
+
+            /* Hide model label */
+            .model-switcher-label {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
             .audio-player {
                 padding: 1rem;
             }
@@ -883,80 +950,82 @@
         <!-- Fixed Toolbar -->
         <div class="toolbar">
             <span class="toolbar-title">Audio Transcription Studio</span>
-            <div class="toolbar-stats">
-                <div class="toolbar-stat">
-                    <span class="toolbar-stat-value">{{ displayedFiles }}/{{ totalFiles }}</span>
-                    <span class="toolbar-stat-label">Recordings</span>
-                </div>
-                <div class="toolbar-stat">
-                    <span class="toolbar-stat-value">{{ completedFiles }}</span>
-                    <span class="toolbar-stat-label">Transcribed</span>
-                </div>
-                <div class="toolbar-stat">
-                    <span class="toolbar-stat-value">{{ processingFiles }}</span>
-                    <span class="toolbar-stat-label">Processing</span>
-                </div>
-            </div>
-
-            <!-- Sort control (Feature 4) -->
-            <div class="toolbar-sort">
-                <label for="sort-select">Sort:</label>
-                <select id="sort-select" class="toolbar-select" v-model="sortKey">
-                    <option value="filename">Name</option>
-                    <option value="date_desc">Newest</option>
-                    <option value="date_asc">Oldest</option>
-                    <option value="quality">Quality</option>
-                    <option value="size">Size</option>
-                </select>
-            </div>
-
-            <div class="toolbar-filter">
-                <label for="filter-input">Filter:</label>
-                <input id="filter-input" ref="filterInput" type="text" v-model="filterText" placeholder="regex...">
-            </div>
-
-            <div class="toolbar-toggle">
-                <span class="toolbar-toggle-label">Live</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" v-model="livePlayback">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-
-            <!-- Whisper Model Switcher (Feature 6) -->
-            <div class="model-switcher">
-                <span class="model-switcher-label">Model:</span>
-                <span v-if="modelLoading" class="model-loading-indicator">
-                    <span class="spinner"></span> loading...
-                </span>
-                <select v-else class="toolbar-select" v-model="selectedModel" @change="onModelChange" title="Switch Whisper model">
-                    <option value="tiny">tiny</option>
-                    <option value="base">base</option>
-                    <option value="small">small</option>
-                    <option value="medium">medium</option>
-                    <option value="large">large</option>
-                </select>
-            </div>
-
-            <button
-                class="icon-button record-button"
-                :class="{ recording: isRecording, disabled: !canRecord }"
-                @mousedown.prevent="onRecordMouseDown"
-                @mouseup.prevent="onRecordMouseUp"
-                @mouseleave="onRecordMouseLeave"
-                @touchstart.prevent="onRecordTouchStart"
-                @touchend.prevent="onRecordTouchEnd"
-                @touchcancel.prevent="onRecordTouchEnd"
-                @contextmenu.prevent
-                :title="!canRecord ? 'Recording not supported (requires HTTPS)' : isRecording ? 'Recording... ' + Math.floor(recordingElapsed) + 's' : 'Hold to record'"
-            >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <circle cx="12" cy="12" r="10"/>
-                </svg>
-            </button>
-            <span v-if="recordingError" class="recording-error" style="color: #ff4444; font-size: 0.65rem; margin-left: 4px; white-space: nowrap;">{{ recordingError }}</span>
             <div class="toolbar-connection">
                 <div class="status-indicator" :class="{ disconnected: !connected }"></div>
+            </div>
+            <div class="toolbar-controls-row">
+                <div class="toolbar-stats">
+                    <div class="toolbar-stat">
+                        <span class="toolbar-stat-value">{{ displayedFiles }}/{{ totalFiles }}</span>
+                        <span class="toolbar-stat-label">Recordings</span>
+                    </div>
+                    <div class="toolbar-stat">
+                        <span class="toolbar-stat-value">{{ completedFiles }}</span>
+                        <span class="toolbar-stat-label">Transcribed</span>
+                    </div>
+                    <div class="toolbar-stat">
+                        <span class="toolbar-stat-value">{{ processingFiles }}</span>
+                        <span class="toolbar-stat-label">Processing</span>
+                    </div>
+                </div>
+
+                <!-- Sort control (Feature 4) -->
+                <div class="toolbar-sort">
+                    <label for="sort-select">Sort:</label>
+                    <select id="sort-select" class="toolbar-select" v-model="sortKey">
+                        <option value="filename">Name</option>
+                        <option value="date_desc">Newest</option>
+                        <option value="date_asc">Oldest</option>
+                        <option value="quality">Quality</option>
+                        <option value="size">Size</option>
+                    </select>
+                </div>
+
+                <div class="toolbar-filter">
+                    <label for="filter-input">Filter:</label>
+                    <input id="filter-input" ref="filterInput" type="text" v-model="filterText" placeholder="regex...">
+                </div>
+
+                <div class="toolbar-toggle">
+                    <span class="toolbar-toggle-label">Live</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" v-model="livePlayback">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <!-- Whisper Model Switcher (Feature 6) -->
+                <div class="model-switcher">
+                    <span class="model-switcher-label">Model:</span>
+                    <span v-if="modelLoading" class="model-loading-indicator">
+                        <span class="spinner"></span> loading...
+                    </span>
+                    <select v-else class="toolbar-select" v-model="selectedModel" @change="onModelChange" title="Switch Whisper model">
+                        <option value="tiny">tiny</option>
+                        <option value="base">base</option>
+                        <option value="small">small</option>
+                        <option value="medium">medium</option>
+                        <option value="large">large</option>
+                    </select>
+                </div>
+
+                <button
+                    class="icon-button record-button"
+                    :class="{ recording: isRecording, disabled: !canRecord }"
+                    @mousedown.prevent="onRecordMouseDown"
+                    @mouseup.prevent="onRecordMouseUp"
+                    @mouseleave="onRecordMouseLeave"
+                    @touchstart.prevent="onRecordTouchStart"
+                    @touchend.prevent="onRecordTouchEnd"
+                    @touchcancel.prevent="onRecordTouchEnd"
+                    @contextmenu.prevent
+                    :title="!canRecord ? 'Recording not supported (requires HTTPS)' : isRecording ? 'Recording... ' + Math.floor(recordingElapsed) + 's' : 'Hold to record'"
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="12" r="10"/>
+                    </svg>
+                </button>
+                <span v-if="recordingError" class="recording-error" style="color: #ff4444; font-size: 0.65rem; margin-left: 4px; white-space: nowrap;">{{ recordingError }}</span>
             </div>
         </div>
 
