@@ -43,6 +43,7 @@ transcription_queue = queue.PriorityQueue()
 file_registry: Dict[str, dict] = {}
 shutdown_event = threading.Event()
 whisper_model = None
+current_model_name = 'base'  # Track active model name for UI
 
 
 class AudioFileHandler(FileSystemEventHandler):
@@ -141,12 +142,15 @@ def scan_existing_files():
             transcription_queue.put(mp3_file)
 
 
-def load_whisper_model():
-    """Load the Whisper model (lazy, once)"""
-    global whisper_model
-    if whisper_model is None:
-        logger.info("[Whisper] Loading 'base' model (first load may download ~140MB)...")
-        whisper_model = whisper.load_model("base")
+def load_whisper_model(model_name: str = None):
+    """Load the Whisper model (lazy, once). Pass model_name to force a reload."""
+    global whisper_model, current_model_name
+    if model_name is None:
+        model_name = current_model_name
+    if whisper_model is None or model_name != current_model_name:
+        logger.info(f"[Whisper] Loading '{model_name}' model...")
+        whisper_model = whisper.load_model(model_name)
+        current_model_name = model_name
         logger.info("[Whisper] Model loaded successfully")
     return whisper_model
 
@@ -155,7 +159,7 @@ def transcribe_audio(file_path: Path) -> dict:
     """Transcribe an audio file using local OpenAI Whisper.
     Returns dict with 'text', 'avg_logprob', 'no_speech_prob', 'language'."""
     try:
-        logger.info(f"Starting transcription of {file_path.name}")
+        logger.info(f"Starting transcription of {file_path.name} (model: {current_model_name})")
         model = load_whisper_model()
         result = model.transcribe(str(file_path))
         text = result["text"].strip()
@@ -338,7 +342,70 @@ def handle_retranscribe(data):
 @socketio.on('get_config')
 def handle_get_config(data=None):
     """Send server configuration to requesting client"""
-    emit('config', {'max_record_seconds': MAX_RECORD_SECONDS})
+    emit('config', {
+        'max_record_seconds': MAX_RECORD_SECONDS,
+        'whisper_model': current_model_name,
+    })
+
+
+@socketio.on('set_model')
+def handle_set_model(data):
+    """Switch the Whisper model at runtime"""
+    import flask
+    VALID_MODELS = ['tiny', 'base', 'small', 'medium', 'large']
+    model_name = data.get('model', '').strip()
+
+    if model_name not in VALID_MODELS:
+        emit('error', {'message': f'Invalid model: {model_name}. Choose from {VALID_MODELS}'})
+        return
+
+    if model_name == current_model_name:
+        emit('model_changed', {'model': current_model_name, 'message': 'Model already active'})
+        return
+
+    logger.info(f"[Model] Client {flask.request.sid} switching Whisper model to '{model_name}'")
+    # Broadcast loading state
+    socketio.emit('model_loading', {'model': model_name})
+
+    # Load in a background thread to avoid blocking the event loop
+    def _load():
+        global whisper_model
+        whisper_model = None  # Force reload
+        load_whisper_model(model_name)
+        logger.info(f"[Model] Switched to '{model_name}'")
+        socketio.emit('model_changed', {'model': current_model_name})
+
+    threading.Thread(target=_load, daemon=True).start()
+
+
+@socketio.on('save_transcription')
+def handle_save_transcription(data):
+    """Save an edited transcription text to disk"""
+    import flask
+    filename = data.get('filename')
+    text = data.get('text', '')
+
+    if not filename:
+        emit('error', {'message': 'No filename provided'})
+        return
+
+    if filename not in file_registry:
+        emit('error', {'message': f'File not found: {filename}'})
+        return
+
+    mp3_path = RECORDINGS_DIR / filename
+    txt_path = mp3_path.with_suffix('.txt')
+
+    try:
+        txt_path.write_text(text, encoding='utf-8')
+        file_registry[filename]['transcription'] = text
+        logger.info(f"[Edit] Client {flask.request.sid} saved transcription for '{filename}'")
+        # Broadcast updated file to all clients
+        socketio.emit('file_update', file_registry[filename])
+        emit('save_ok', {'filename': filename})
+    except Exception as e:
+        logger.error(f"[Edit] Failed to save transcription for '{filename}': {e}")
+        emit('error', {'message': f'Failed to save: {str(e)}'})
 
 
 # Flask routes

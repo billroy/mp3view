@@ -121,6 +121,43 @@
             letter-spacing: 0.08em;
         }
 
+        /* Sort control */
+        .toolbar-sort {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-shrink: 0;
+        }
+
+        .toolbar-sort label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            white-space: nowrap;
+        }
+
+        .toolbar-select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.4rem;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+        }
+
+        .toolbar-select:focus {
+            border-color: var(--accent-primary);
+        }
+
+        .toolbar-select option {
+            background: var(--bg-secondary);
+        }
+
         .toolbar-filter {
             display: flex;
             align-items: center;
@@ -313,6 +350,12 @@
             transform: scaleY(1);
         }
 
+        /* Keyboard-selected item highlight */
+        .audio-item.kb-selected {
+            outline: 2px solid var(--accent-tertiary);
+            outline-offset: -2px;
+        }
+
         .audio-header {
             display: flex;
             justify-content: space-between;
@@ -382,8 +425,8 @@
             border: 1px solid rgba(139, 148, 158, 0.3);
         }
 
+        /* Transcription text — confidence coloring via inline style */
         .transcription {
-            color: var(--text-primary);
             font-size: 0.9rem;
             line-height: 1.4;
             margin-bottom: 0;
@@ -393,6 +436,54 @@
         .transcription.empty {
             color: var(--text-muted);
             font-style: italic;
+        }
+
+        /* Inline transcription editor */
+        .transcription-editor {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--accent-primary);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            padding: 0.3rem 0.5rem;
+            resize: vertical;
+            outline: none;
+            min-height: 3em;
+        }
+
+        .transcription-edit-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.3rem;
+        }
+
+        .transcription-edit-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            border-radius: 4px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .transcription-edit-btn.save {
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .transcription-edit-btn.save:hover {
+            background: rgba(63, 185, 80, 0.15);
+        }
+
+        .transcription-edit-btn.cancel:hover {
+            border-color: var(--accent-secondary);
+            color: var(--accent-secondary);
         }
 
         .header-right {
@@ -439,6 +530,22 @@
                 border-color: var(--accent-tertiary);
                 color: var(--accent-tertiary);
             }
+
+            .icon-button.copy-icon:hover:not(:disabled) {
+                border-color: var(--accent-primary);
+                color: var(--accent-primary);
+            }
+
+            .icon-button.edit-icon:hover:not(:disabled) {
+                border-color: var(--processing);
+                color: var(--processing);
+            }
+        }
+
+        /* Copy flash feedback */
+        .icon-button.copy-icon.copied {
+            border-color: var(--success);
+            color: var(--success);
         }
 
         /* Record button */
@@ -571,6 +678,47 @@
             box-shadow: 0 8px 24px rgba(0, 217, 255, 0.3);
         }
 
+        /* Playback speed controls */
+        .speed-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            flex-shrink: 0;
+        }
+
+        .speed-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-right: 0.15rem;
+        }
+
+        .speed-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            border-radius: 3px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.7rem;
+            padding: 0.15rem 0.35rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .speed-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .speed-btn.active {
+            background: rgba(0, 217, 255, 0.15);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+
         .progress-container {
             flex: 1;
             display: flex;
@@ -614,6 +762,56 @@
             border-radius: 50%;
             transform: translate(50%, -25%);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Model switcher */
+        .model-switcher {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-shrink: 0;
+        }
+
+        .model-switcher-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            white-space: nowrap;
+        }
+
+        .model-loading-indicator {
+            font-size: 0.65rem;
+            color: var(--accent-tertiary);
+            white-space: nowrap;
+        }
+
+        /* Keyboard shortcut hint bar */
+        .kb-hint {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-bottom: none;
+            border-radius: 6px 6px 0 0;
+            padding: 0.2rem 1rem;
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            z-index: 998;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .kb-hint kbd {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 0 3px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--text-secondary);
         }
 
         /* Empty state */
@@ -668,6 +866,15 @@
                 flex-direction: column;
                 gap: 1rem;
             }
+
+            .speed-controls {
+                flex-wrap: wrap;
+            }
+
+            .model-switcher-label,
+            .model-loading-indicator {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -690,10 +897,24 @@
                     <span class="toolbar-stat-label">Processing</span>
                 </div>
             </div>
+
+            <!-- Sort control (Feature 4) -->
+            <div class="toolbar-sort">
+                <label for="sort-select">Sort:</label>
+                <select id="sort-select" class="toolbar-select" v-model="sortKey">
+                    <option value="filename">Name</option>
+                    <option value="date_desc">Newest</option>
+                    <option value="date_asc">Oldest</option>
+                    <option value="quality">Quality</option>
+                    <option value="size">Size</option>
+                </select>
+            </div>
+
             <div class="toolbar-filter">
                 <label for="filter-input">Filter:</label>
-                <input id="filter-input" type="text" v-model="filterText" placeholder="regex...">
+                <input id="filter-input" ref="filterInput" type="text" v-model="filterText" placeholder="regex...">
             </div>
+
             <div class="toolbar-toggle">
                 <span class="toolbar-toggle-label">Live</span>
                 <label class="toggle-switch">
@@ -701,6 +922,22 @@
                     <span class="toggle-slider"></span>
                 </label>
             </div>
+
+            <!-- Whisper Model Switcher (Feature 6) -->
+            <div class="model-switcher">
+                <span class="model-switcher-label">Model:</span>
+                <span v-if="modelLoading" class="model-loading-indicator">
+                    <span class="spinner"></span> loading...
+                </span>
+                <select v-else class="toolbar-select" v-model="selectedModel" @change="onModelChange" title="Switch Whisper model">
+                    <option value="tiny">tiny</option>
+                    <option value="base">base</option>
+                    <option value="small">small</option>
+                    <option value="medium">medium</option>
+                    <option value="large">large</option>
+                </select>
+            </div>
+
             <button
                 class="icon-button record-button"
                 :class="{ recording: isRecording, disabled: !canRecord }"
@@ -728,9 +965,14 @@
             <div
                 v-for="(file, index) in filteredFiles"
                 :key="file.filename"
+                :data-filename="file.filename"
                 :style="{ animationDelay: `${index * 0.05}s` }"
                 class="audio-item"
-                :class="{ active: currentFile && currentFile.filename === file.filename }"
+                :class="{
+                    active: currentFile && currentFile.filename === file.filename,
+                    'kb-selected': kbSelectedIndex === index
+                }"
+                @click="onItemClick(file, index)"
             >
                 <div class="audio-header">
                     <h3 class="audio-title">{{ file.filename }} <span class="file-size">({{ file.size_kb }}k)</span><template v-if="file.language"> <span class="quality-metrics">{{ file.language }} logp={{ file.avg_logprob }} nsp={{ file.no_speech_prob }}</span></template></h3>
@@ -739,6 +981,26 @@
                             <span v-if="file.status === 'processing'" class="spinner"></span>
                             {{ file.status }}
                         </span>
+                        <!-- Copy button (Feature 3) -->
+                        <button
+                            class="icon-button copy-icon"
+                            :class="{ copied: copiedFilename === file.filename }"
+                            @click.stop="copyTranscription(file)"
+                            :disabled="!file.transcription"
+                            title="Copy transcription"
+                        >
+                            <svg v-if="copiedFilename === file.filename" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 1 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z"/></svg>
+                            <svg v-else width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>
+                        </button>
+                        <!-- Edit button (Feature 2) -->
+                        <button
+                            class="icon-button edit-icon"
+                            @click.stop="startEdit(file)"
+                            :disabled="!file.transcription || editingFilename === file.filename"
+                            title="Edit transcription"
+                        >
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 0 0-.064.108l-.558 1.953 1.953-.558a.253.253 0 0 0 .108-.064Zm1.238-3.763a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354Z"/></svg>
+                        </button>
                         <button
                             class="icon-button play-icon"
                             @click.stop="playAudio(file)"
@@ -759,7 +1021,30 @@
                     </div>
                 </div>
 
-                <p class="transcription" :class="{ empty: !file.transcription }">
+                <!-- Transcription text or inline editor (Features 2 & 10) -->
+                <div v-if="editingFilename === file.filename">
+                    <textarea
+                        class="transcription-editor"
+                        v-model="editText"
+                        @keydown.esc="cancelEdit"
+                        @keydown.ctrl.enter="saveEdit(file)"
+                        @keydown.meta.enter="saveEdit(file)"
+                        @click.stop
+                        ref="editTextarea"
+                        rows="3"
+                    ></textarea>
+                    <div class="transcription-edit-actions">
+                        <button class="transcription-edit-btn save" @click.stop="saveEdit(file)">Save (Ctrl+↵)</button>
+                        <button class="transcription-edit-btn cancel" @click.stop="cancelEdit">Cancel (Esc)</button>
+                    </div>
+                </div>
+                <p v-else
+                    class="transcription"
+                    :class="{ empty: !file.transcription }"
+                    :style="confidenceStyle(file)"
+                    @dblclick.stop="startEdit(file)"
+                    :title="file.transcription ? 'Double-click to edit' : ''"
+                >
                     {{ file.transcription || 'Awaiting transcription...' }}
                 </p>
             </div>
@@ -784,15 +1069,15 @@
                 </div>
 
                 <div class="player-controls">
-                    <button class="control-button" @click="skipBackward" title="Skip backward 10s">
+                    <button class="control-button" @click="skipBackward" title="Skip backward 10s (J)">
                         ⏪
                     </button>
 
-                    <button class="control-button play-pause" @click="togglePlayPause">
+                    <button class="control-button play-pause" @click="togglePlayPause" title="Play/Pause (Space)">
                         {{ isPlaying ? '⏸' : '▶' }}
                     </button>
 
-                    <button class="control-button" @click="skipForward" title="Skip forward 10s">
+                    <button class="control-button" @click="skipForward" title="Skip forward 10s (L)">
                         ⏩
                     </button>
 
@@ -805,8 +1090,29 @@
                             <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
                         </div>
                     </div>
+
+                    <!-- Playback speed (Feature 5) -->
+                    <div class="speed-controls">
+                        <span class="speed-label">Speed:</span>
+                        <button
+                            v-for="rate in speedOptions"
+                            :key="rate"
+                            class="speed-btn"
+                            :class="{ active: playbackRate === rate }"
+                            @click="setPlaybackRate(rate)"
+                        >{{ rate }}×</button>
+                    </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Keyboard shortcut hint (only shown when player is open) -->
+        <div class="kb-hint" v-if="showPlayerBar">
+            <kbd>Space</kbd> play/pause &nbsp;
+            <kbd>J</kbd><kbd>L</kbd> ±10s &nbsp;
+            <kbd>↑</kbd><kbd>↓</kbd> navigate &nbsp;
+            <kbd>/</kbd> filter &nbsp;
+            <kbd>R</kbd> re-transcribe
         </div>
 
         <!-- Audio element always present for live playback -->
@@ -822,7 +1128,7 @@
     </div>
 
     <script>
-        const { createApp } = Vue;
+        const { createApp, nextTick } = Vue;
 
         createApp({
             data() {
@@ -831,6 +1137,7 @@
                     connected: false,
                     files: [],
                     filterText: '',
+                    sortKey: localStorage.getItem('sortKey') || 'filename',
                     currentFile: null,
                     isPlaying: false,
                     currentTime: 0,
@@ -850,7 +1157,28 @@
                     recordingButtonPressed: false,
                     _isTouching: false,
                     recordingError: '',
-                    canRecord: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (typeof MediaRecorder !== 'undefined'))
+                    canRecord: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (typeof MediaRecorder !== 'undefined')),
+
+                    // Feature 4: sort
+                    // sortKey set above from localStorage
+
+                    // Feature 5: playback speed
+                    playbackRate: 1,
+                    speedOptions: [0.5, 0.75, 1, 1.25, 1.5, 2],
+
+                    // Feature 6: model switcher
+                    selectedModel: 'base',
+                    modelLoading: false,
+
+                    // Feature 2: transcription editing
+                    editingFilename: null,
+                    editText: '',
+
+                    // Feature 3: copy feedback
+                    copiedFilename: null,
+
+                    // Feature 1: keyboard navigation
+                    kbSelectedIndex: -1,
                 }
             },
 
@@ -864,9 +1192,27 @@
                     }
                 },
 
+                sortedFiles() {
+                    const arr = [...this.files];
+                    switch (this.sortKey) {
+                        case 'date_desc':
+                            return arr.sort((a, b) => (b.added || '').localeCompare(a.added || ''));
+                        case 'date_asc':
+                            return arr.sort((a, b) => (a.added || '').localeCompare(b.added || ''));
+                        case 'quality':
+                            // Higher avg_logprob (less negative) = better quality
+                            return arr.sort((a, b) => (b.avg_logprob || -10) - (a.avg_logprob || -10));
+                        case 'size':
+                            return arr.sort((a, b) => (b.size_kb || 0) - (a.size_kb || 0));
+                        case 'filename':
+                        default:
+                            return arr.sort((a, b) => a.filename.localeCompare(b.filename));
+                    }
+                },
+
                 filteredFiles() {
-                    if (!this.filterRegex) return this.files;
-                    return this.files.filter(f => {
+                    if (!this.filterRegex) return this.sortedFiles;
+                    return this.sortedFiles.filter(f => {
                         return this.filterRegex.test(f.filename) ||
                                (f.transcription && this.filterRegex.test(f.transcription));
                     });
@@ -898,9 +1244,17 @@
                 }
             },
 
+            watch: {
+                sortKey(val) {
+                    localStorage.setItem('sortKey', val);
+                    // Reset keyboard selection when sort changes
+                    this.kbSelectedIndex = -1;
+                }
+            },
+
             mounted() {
                 this.initSocket();
-                // Log recording capability for debugging
+                this.initKeyboardShortcuts();
                 console.log('Recording support:', {
                     mediaDevices: !!navigator.mediaDevices,
                     getUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
@@ -911,20 +1265,192 @@
                     canRecord: this.canRecord
                 });
                 if (!this.canRecord && !window.isSecureContext) {
-                    console.warn('Recording disabled: page is not a secure context (HTTPS required for microphone access on non-localhost)');
+                    console.warn('Recording disabled: page is not a secure context');
                 }
             },
 
+            beforeUnmount() {
+                document.removeEventListener('keydown', this._keydownHandler);
+            },
+
             methods: {
+                // ── Feature 1: Keyboard Shortcuts ─────────────────────────────
+                initKeyboardShortcuts() {
+                    this._keydownHandler = (e) => {
+                        // Don't fire when typing in inputs/textareas
+                        const tag = document.activeElement.tagName;
+                        const isEditing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+                        // '/' — focus filter (allow even when editing to quick-jump)
+                        if (e.key === '/' && !isEditing) {
+                            e.preventDefault();
+                            this.$refs.filterInput && this.$refs.filterInput.focus();
+                            return;
+                        }
+
+                        if (isEditing) return;
+
+                        switch (e.key) {
+                            case ' ':
+                                e.preventDefault();
+                                if (this.currentFile) this.togglePlayPause();
+                                break;
+
+                            case 'j':
+                            case 'J':
+                                e.preventDefault();
+                                if (this.currentFile) this.skipBackward();
+                                break;
+
+                            case 'l':
+                            case 'L':
+                                e.preventDefault();
+                                if (this.currentFile) this.skipForward();
+                                break;
+
+                            case 'ArrowUp': {
+                                e.preventDefault();
+                                const newIdx = Math.max(0, this.kbSelectedIndex - 1);
+                                this.kbSelectedIndex = newIdx;
+                                this.scrollKbItemIntoView(newIdx);
+                                break;
+                            }
+
+                            case 'ArrowDown': {
+                                e.preventDefault();
+                                const max = this.filteredFiles.length - 1;
+                                const newIdx2 = this.kbSelectedIndex < 0 ? 0 : Math.min(max, this.kbSelectedIndex + 1);
+                                this.kbSelectedIndex = newIdx2;
+                                this.scrollKbItemIntoView(newIdx2);
+                                break;
+                            }
+
+                            case 'Enter':
+                                if (this.kbSelectedIndex >= 0 && this.kbSelectedIndex < this.filteredFiles.length) {
+                                    this.playAudio(this.filteredFiles[this.kbSelectedIndex]);
+                                }
+                                break;
+
+                            case 'r':
+                            case 'R':
+                                if (this.kbSelectedIndex >= 0 && this.kbSelectedIndex < this.filteredFiles.length) {
+                                    const f = this.filteredFiles[this.kbSelectedIndex];
+                                    if (f.status !== 'processing' && f.status !== 'queued') {
+                                        this.retranscribe(f);
+                                    }
+                                }
+                                break;
+
+                            case 'Escape':
+                                this.kbSelectedIndex = -1;
+                                break;
+                        }
+                    };
+                    document.addEventListener('keydown', this._keydownHandler);
+                },
+
+                scrollKbItemIntoView(index) {
+                    nextTick(() => {
+                        const items = document.querySelectorAll('.audio-item');
+                        if (items[index]) {
+                            items[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                    });
+                },
+
+                onItemClick(file, index) {
+                    this.kbSelectedIndex = index;
+                },
+
+                // ── Feature 2: Transcription Text Editing ─────────────────────
+                startEdit(file) {
+                    if (!file.transcription) return;
+                    this.editingFilename = file.filename;
+                    this.editText = file.transcription;
+                    nextTick(() => {
+                        if (this.$refs.editTextarea) {
+                            const el = Array.isArray(this.$refs.editTextarea)
+                                ? this.$refs.editTextarea[0]
+                                : this.$refs.editTextarea;
+                            el && el.focus();
+                        }
+                    });
+                },
+
+                saveEdit(file) {
+                    const text = this.editText.trim();
+                    this.socket.emit('save_transcription', {
+                        filename: file.filename,
+                        text: text
+                    });
+                    this.editingFilename = null;
+                    this.editText = '';
+                },
+
+                cancelEdit() {
+                    this.editingFilename = null;
+                    this.editText = '';
+                },
+
+                // ── Feature 3: Copy Transcription ─────────────────────────────
+                copyTranscription(file) {
+                    if (!file.transcription) return;
+                    navigator.clipboard.writeText(file.transcription).then(() => {
+                        this.copiedFilename = file.filename;
+                        setTimeout(() => { this.copiedFilename = null; }, 1500);
+                    }).catch(() => {
+                        // Fallback for older browsers
+                        const ta = document.createElement('textarea');
+                        ta.value = file.transcription;
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                        this.copiedFilename = file.filename;
+                        setTimeout(() => { this.copiedFilename = null; }, 1500);
+                    });
+                },
+
+                // ── Feature 5: Playback Speed ─────────────────────────────────
+                setPlaybackRate(rate) {
+                    this.playbackRate = rate;
+                    const audio = this.$refs.audioElement;
+                    if (audio) audio.playbackRate = rate;
+                },
+
+                // ── Feature 6: Whisper Model Switcher ────────────────────────
+                onModelChange() {
+                    if (this.selectedModel && !this.modelLoading) {
+                        this.socket.emit('set_model', { model: this.selectedModel });
+                    }
+                },
+
+                // ── Feature 10: Confidence Coloring ──────────────────────────
+                confidenceStyle(file) {
+                    if (!file.transcription || file.avg_logprob === undefined || file.avg_logprob === null) {
+                        return { color: 'var(--text-primary)' };
+                    }
+                    const lp = file.avg_logprob;
+                    // avg_logprob is negative; closer to 0 = better
+                    // > -0.3: high confidence (green)
+                    // -0.3 to -0.6: medium (yellow)
+                    // < -0.6: low (red/muted)
+                    if (lp > -0.3) {
+                        return { color: 'var(--success)' };
+                    } else if (lp > -0.6) {
+                        return { color: 'var(--accent-tertiary)' };
+                    } else {
+                        return { color: 'var(--accent-secondary)' };
+                    }
+                },
+
+                // ── Socket ────────────────────────────────────────────────────
                 initSocket() {
-                    // Connect to SocketIO server
                     this.socket = io();
 
-                    // Connection events
                     this.socket.on('connect', () => {
                         console.log('Connected to server');
                         this.connected = true;
-                        // Request initial file list and config
                         this.socket.emit('get_files');
                         this.socket.emit('get_config');
                     });
@@ -934,56 +1460,59 @@
                         this.connected = false;
                     });
 
-                    // File list response
                     this.socket.on('files_list', (data) => {
                         console.log('Received files list:', data);
-                        this.files = data.files.sort((a, b) => a.filename.localeCompare(b.filename));
-                        // Mark initial load complete after a short delay to ignore
-                        // any file_update events that arrive during startup
+                        this.files = data.files;
                         setTimeout(() => {
                             this.initialLoadComplete = true;
                         }, 2000);
                     });
 
-                    // File update notification (broadcast to all clients)
                     this.socket.on('file_update', (fileData) => {
                         console.log('File update received:', fileData);
                         const index = this.files.findIndex(f => f.filename === fileData.filename);
                         const isNew = index < 0;
 
                         if (index >= 0) {
-                            // Update existing file (splice for Vue reactivity)
                             this.files.splice(index, 1, fileData);
                         } else {
-                            // Add new file and re-sort
                             this.files.push(fileData);
-                            this.files.sort((a, b) => a.filename.localeCompare(b.filename));
                         }
 
-                        // Update current file if it's being played
                         if (this.currentFile && this.currentFile.filename === fileData.filename) {
                             this.currentFile = fileData;
                         }
 
-                        // Queue for live playback if enabled, past initial load, and this is a new file
                         if (this.livePlayback && this.initialLoadComplete && isNew) {
                             this.queueLivePlayback(fileData.filename);
                         }
                     });
 
-                    // Audio stream ready response
                     this.socket.on('audio_stream_ready', (data) => {
                         console.log('Audio stream ready:', data);
                         this.loadAudio(data.url);
                     });
 
-                    // Config response
                     this.socket.on('config', (data) => {
                         console.log('Config received:', data);
                         this.maxRecordSeconds = data.max_record_seconds;
+                        if (data.whisper_model) {
+                            this.selectedModel = data.whisper_model;
+                        }
                     });
 
-                    // Error handling
+                    // Feature 6: model switching events
+                    this.socket.on('model_loading', (data) => {
+                        console.log('Model loading:', data.model);
+                        this.modelLoading = true;
+                    });
+
+                    this.socket.on('model_changed', (data) => {
+                        console.log('Model changed to:', data.model);
+                        this.selectedModel = data.model;
+                        this.modelLoading = false;
+                    });
+
                     this.socket.on('error', (error) => {
                         console.error('Socket error:', error);
                     });
@@ -994,15 +1523,12 @@
                 },
 
                 playAudio(file) {
-                    // Cancel live playback if user manually selects a file
                     this.livePlaybackActive = false;
                     this.liveQueue = [];
 
                     if (this.currentFile && this.currentFile.filename === file.filename) {
-                        // Toggle play/pause for current file
                         this.togglePlayPause();
                     } else {
-                        // Load and play new file
                         this.currentFile = file;
                         this.socket.emit('request_audio_stream', { filename: file.filename });
                     }
@@ -1012,6 +1538,7 @@
                     const audio = this.$refs.audioElement;
                     audio.src = url;
                     audio.load();
+                    audio.playbackRate = this.playbackRate;
                     audio.play();
                 },
 
@@ -1049,24 +1576,24 @@
 
                 onAudioLoaded() {
                     const audio = this.$refs.audioElement;
-                    if (audio) this.duration = audio.duration;
+                    if (audio) {
+                        this.duration = audio.duration;
+                        audio.playbackRate = this.playbackRate;
+                    }
                 },
 
                 onAudioEnded() {
                     this.isPlaying = false;
-                    // If live playback is active, play next in queue
                     if (this.livePlaybackActive) {
                         this.playNextInLiveQueue();
                     }
                 },
 
                 queueLivePlayback(filename) {
-                    // Add to queue in sorted position
                     if (!this.liveQueue.includes(filename)) {
                         this.liveQueue.push(filename);
                         this.liveQueue.sort();
                     }
-                    // Start processing queue if not already playing
                     if (!this.livePlaybackActive) {
                         this.playNextInLiveQueue();
                     }
@@ -1083,13 +1610,11 @@
                     const filename = this.liveQueue.shift();
                     const file = this.files.find(f => f.filename === filename);
                     if (!file) {
-                        // File not found, skip to next
                         this.playNextInLiveQueue();
                         return;
                     }
 
-                    // Scroll to the item
-                    this.$nextTick(() => {
+                    nextTick(() => {
                         const idx = this.filteredFiles.findIndex(f => f.filename === filename);
                         if (idx >= 0) {
                             const items = document.querySelectorAll('.audio-item');
@@ -1099,7 +1624,6 @@
                         }
                     });
 
-                    // Set currentFile for tracking but player bar won't show due to livePlaybackActive
                     this.currentFile = file;
                     this.socket.emit('request_audio_stream', { filename: file.filename });
                 },
@@ -1114,10 +1638,9 @@
                     this.liveQueue = [];
                 },
 
-                // Record button event handlers — separate mouse and touch
-                // to prevent ghost events on touch devices
+                // ── Recording ─────────────────────────────────────────────────
                 onRecordMouseDown() {
-                    if (this._isTouching) return; // ignore mouse events from touch
+                    if (this._isTouching) return;
                     this.startRecording();
                 },
                 onRecordMouseUp() {
@@ -1136,7 +1659,6 @@
                 onRecordTouchEnd(e) {
                     e.preventDefault();
                     this.stopRecording();
-                    // Clear touch flag after a delay to block ghost mouse events
                     setTimeout(() => { this._isTouching = false; }, 400);
                 },
 
@@ -1150,21 +1672,15 @@
                     this.recordingError = '';
                     this.recordingButtonPressed = true;
 
-                    // If we already have mic permission (stream still open), start immediately
                     if (this.recordingStream) {
                         this._beginRecordingSegment();
                         return;
                     }
 
-                    // Request mic — getUserMedia MUST be called synchronously from
-                    // user gesture handler. On iOS Safari, any async gap (await, setTimeout)
-                    // between the touch event and getUserMedia will cause it to be rejected.
-                    // We use .then() to handle the result without breaking the call chain.
                     var self = this;
                     try {
                         navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
                             self.recordingStream = stream;
-                            // Only start if button is still held (user may have released during permission prompt)
                             if (self.recordingButtonPressed) {
                                 self._beginRecordingSegment();
                             } else {
@@ -1190,12 +1706,9 @@
                 _beginRecordingSegment() {
                     this.recordingChunks = [];
 
-                    // Determine best supported mime type
-                    // Safari/iOS: typically supports audio/mp4, NOT audio/webm
                     var mimeType = '';
                     try {
                         if (typeof MediaRecorder.isTypeSupported === 'function') {
-                            // Try mp4 first for Safari/iOS compatibility
                             if (MediaRecorder.isTypeSupported('audio/mp4')) {
                                 mimeType = 'audio/mp4';
                             } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -1203,7 +1716,6 @@
                             } else if (MediaRecorder.isTypeSupported('audio/webm')) {
                                 mimeType = 'audio/webm';
                             }
-                            // else leave empty — let browser pick default
                         }
                     } catch (e) {
                         console.warn('isTypeSupported check failed:', e);
@@ -1215,7 +1727,6 @@
                         this.mediaRecorder = new MediaRecorder(this.recordingStream, options);
                     } catch (e) {
                         console.error('MediaRecorder creation failed with options', options, e);
-                        // Retry with no options
                         try {
                             this.mediaRecorder = new MediaRecorder(this.recordingStream);
                         } catch (e2) {
@@ -1247,8 +1758,6 @@
                         if (blob.size > 0) {
                             self.sendRecording(blob, activeMimeType);
                         }
-
-                        // If button is still held, start a new segment (auto-split)
                         if (self.recordingButtonPressed) {
                             self._beginRecordingSegment();
                         } else {
@@ -1256,13 +1765,11 @@
                         }
                     };
 
-                    // Use timeslice of 1000ms; some iOS versions need this
                     this.mediaRecorder.start(1000);
                     this.isRecording = true;
                     this.recordingStartTime = Date.now();
                     this.recordingElapsed = 0;
 
-                    // Timer for elapsed display and max duration enforcement
                     this.recordingTimer = setInterval(function() {
                         self.recordingElapsed = (Date.now() - self.recordingStartTime) / 1000;
                         if (self.recordingElapsed >= self.maxRecordSeconds) {
@@ -1297,7 +1804,6 @@
                 },
 
                 sendRecording(blob, mimeType) {
-                    // Determine file extension from mime type for server-side conversion
                     var ext = (mimeType && mimeType.indexOf('mp4') !== -1) ? '.mp4' : '.webm';
                     var formData = new FormData();
                     formData.append('audio', blob, 'recording' + ext);
