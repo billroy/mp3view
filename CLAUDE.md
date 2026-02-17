@@ -2,4 +2,5 @@
 
 ## Git Workflow
 - **Never create pull requests** for this project.
-- Always **commit and push directly to origin** (main branch).
+- Get approval before comitting changes
+- Once approved, always **commit and push directly to origin** (main branch).
