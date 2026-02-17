@@ -43,7 +43,7 @@ transcription_queue = queue.PriorityQueue()
 file_registry: Dict[str, dict] = {}
 shutdown_event = threading.Event()
 whisper_model = None
-current_model_name = 'base'  # Track active model name for UI
+current_model_name = 'large'  # Track active model name for UI
 
 
 class AudioFileHandler(FileSystemEventHandler):
@@ -532,13 +532,22 @@ def main():
         action='store_true',
         help='Enable HTTPS with a self-signed certificate (required for microphone on non-localhost devices like iPad)'
     )
+    parser.add_argument(
+        '--model',
+        type=str,
+        default='large',
+        choices=['tiny', 'base', 'small', 'medium', 'large'],
+        help='Whisper model to use for transcription (default: large)'
+    )
 
     args = parser.parse_args()
 
     # Set recordings directory and config
     RECORDINGS_DIR = Path(args.recordings_dir)
-    global MAX_RECORD_SECONDS
+    global MAX_RECORD_SECONDS, current_model_name
     MAX_RECORD_SECONDS = args.max_record_seconds
+    current_model_name = args.model
+    logger.info(f"Using Whisper model: {current_model_name}")
     logger.info(f"Using recordings directory: {RECORDINGS_DIR}")
     
     # Verify static folder exists
